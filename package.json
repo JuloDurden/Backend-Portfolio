@@ -3,29 +3,35 @@
   "version": "1.0.0",
   "description": "API REST pour Portfolio - Node.js + Express + MongoDB",
   "main": "src/app.js",
-  "type": "module",
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
     "test": "jest"
   },
-  "keywords": ["portfolio", "api", "express", "mongodb", "rest"],
+  "keywords": [
+    "portfolio",
+    "api",
+    "express",
+    "mongodb",
+    "rest"
+  ],
   "author": "Julien Clavel",
   "license": "MIT",
   "dependencies": {
-    "express": "^5.1.0",
-    "mongoose": "^8.8.4",
     "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
-    "helmet": "^8.1.0",
+    "dotenv": "^17.2.0",
+    "express": "^4.21.2",
     "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.4",
+    "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "validator": "^13.12.0",
-    "dotenv": "^17.2.0"
+    "validator": "^13.12.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7",
-    "jest": "^30.0.5"
+    "jest": "^30.0.5",
+    "nodemon": "^3.1.7"
   }
 }

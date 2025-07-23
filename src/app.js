@@ -4,12 +4,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
-// Import des routes
-const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profile');
-const skillsRoutes = require('./routes/skills');
-const projectsRoutes = require('./routes/projects');
-
 // Import des middlewares
 const errorHandler = require('./middleware/errorHandler');
 
@@ -40,12 +34,6 @@ app.use(express.urlencoded({ extended: true }));
 // 📁 Static files (uploads)
 app.use('/uploads', express.static('uploads'));
 
-// 🛣️ Routes principales
-app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/skills', skillsRoutes);
-app.use('/api/projects', projectsRoutes);
-
 // 🏠 Route de test
 app.get('/', (req, res) => {
   res.json({ 
@@ -56,7 +44,7 @@ app.get('/', (req, res) => {
 });
 
 // 🚫 Route 404
-app.use('*', (req, res) => {
+app.all('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`
