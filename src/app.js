@@ -19,7 +19,7 @@ connectDB();
 const Project = require('./models/Project');
 const Skill = require('./models/Skill');
 
-// 🛡️ Middlewares de sécurité
+// 🛡️ Middlewares de sécurité (AVANT LES ROUTES!)
 app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// 📦 Parsing du body
+// 📦 Parsing du body (AVANT LES ROUTES!)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -46,6 +46,14 @@ app.get('/', (req, res) => {
     documentation: '/api/docs'
   });
 });
+
+// Routes (⚠️ APRÈS LES MIDDLEWARES! ⚠️)
+const skillRoutes = require('./routes/skillRoutes');
+const projectRoutes = require('./routes/projectRoutes');
+
+// Utilisation des routes
+app.use('/api/skills', skillRoutes);
+app.use('/api/projects', projectRoutes);
 
 // 🚫 Route 404
 app.all('*', (req, res) => {
