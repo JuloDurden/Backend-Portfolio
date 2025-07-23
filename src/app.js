@@ -55,6 +55,16 @@ const projectRoutes = require('./routes/projectRoutes');
 app.use('/api/skills', skillRoutes);
 app.use('/api/projects', projectRoutes);
 
+const userRoutes = require('./routes/userRoutes');
+const experienceRoutes = require('./routes/experienceRoutes');
+
+// Après les routes skills
+app.use('/api/user', userRoutes);
+app.use('/api/experiences', experienceRoutes);
+
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 // 🚫 Route 404
 app.all('*', (req, res) => {
   res.status(404).json({
