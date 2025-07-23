@@ -1,12 +1,10 @@
 // src/controllers/authController.js
 const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+const jwtConfig = require('../config/jwt');
 
 // Générer un token JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
-  });
+  return jwtConfig.generateToken({ id });
 };
 
 const authController = {
@@ -15,7 +13,6 @@ const authController = {
     try {
       const { email, password } = req.body;
 
-      // Vérifier si email et password sont fournis
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -23,7 +20,6 @@ const authController = {
         });
       }
 
-      // Récupérer l'utilisateur avec le password
       const user = await User.findOne({ email }).select('+password');
 
       if (!user || !(await user.comparePassword(password))) {
@@ -33,7 +29,6 @@ const authController = {
         });
       }
 
-      // Générer le token
       const token = generateToken(user._id);
 
       res.json({
@@ -74,6 +69,15 @@ const authController = {
         message: 'Erreur serveur'
       });
     }
+  },
+
+  // POST /api/auth/logout - Déconnexion
+  logout: (req, res) => {
+    res.json({
+      success: true,
+      message: 'Déconnexion réussie'
+    });
+    // Le token sera supprimé côté frontend
   }
 };
 

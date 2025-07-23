@@ -1,13 +1,42 @@
 const Skill = require('../models/Skill');
 
 /**
- * @desc    Récupérer toutes les compétences
+ * @desc    Récupérer toutes les compétences (avec filtres optionnels)
  * @route   GET /api/skills
+ * @route   GET /api/skills?categories=Design
+ * @route   GET /api/skills?level=Senior&featured=true
  * @access  Public
  */
 const getSkills = async (req, res) => {
   try {
-    const skills = await Skill.find().sort({ category: 1, name: 1 });
+    let filter = {};
+
+    // Filtre par catégories (dans un array)
+    if (req.query.categories) {
+      const categoriesArray = req.query.categories.split(',');
+      filter.categories = { $in: categoriesArray };
+    }
+
+    // Filtre par niveau
+    if (req.query.level) {
+      filter.level = req.query.level;
+    }
+
+    // Filtre par featured
+    if (req.query.featured !== undefined) {
+      filter.featured = req.query.featured === 'true';
+    }
+
+    // Filtre par visibilité (par défaut visible uniquement)
+    if (req.query.isVisible !== undefined) {
+      filter.isVisible = req.query.isVisible === 'true';
+    } else {
+      filter.isVisible = true; // Par défaut, seulement les visibles
+    }
+
+    console.log("Filter appliqué:", filter); // DEBUG
+
+    const skills = await Skill.find(filter).sort({ order: 1, name: 1 });
     
     res.status(200).json({
       success: true,
@@ -22,6 +51,7 @@ const getSkills = async (req, res) => {
     });
   }
 };
+
 
 /**
  * @desc    Récupérer les compétences par catégorie
