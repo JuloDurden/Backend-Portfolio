@@ -15,6 +15,10 @@ const app = express();
 // 🔗 Connexion à la base de données
 connectDB();
 
+// 🧪 Test des modèles (temporaire)
+const Project = require('./models/Project');
+const Skill = require('./models/Skill');
+
 // 🛡️ Middlewares de sécurité
 app.use(helmet());
 app.use(cors({
