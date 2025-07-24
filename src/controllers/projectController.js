@@ -1,4 +1,6 @@
 const Project = require('../models/Project');
+const path = require('path');
+const fs = require('fs');
 
 /**
  * @desc    Récupérer tous les projets
@@ -113,7 +115,28 @@ const getFeaturedProjects = async (req, res) => {
  */
 const createProject = async (req, res) => {
   try {
-    const project = await Project.create(req.body);
+    // 🔧 NOUVEAU : Récupération des chemins d'images depuis req.files
+    const projectData = { ...req.body };
+    
+    // Si des fichiers ont été uploadés, on récupère leurs chemins
+    if (req.uploadedFiles) {
+      const { covers, pictures } = req.uploadedFiles;
+      
+      // Structure des covers (small/large)
+      if (covers && covers.length >= 2) {
+        projectData.cover = {
+          small: covers.find(f => f.includes('_400')),
+          large: covers.find(f => f.includes('_1000'))
+        };
+      }
+      
+      // Array des pictures
+      if (pictures && pictures.length > 0) {
+        projectData.pictures = pictures;
+      }
+    }
+    
+    const project = await Project.create(projectData);
     
     res.status(201).json({
       success: true,
@@ -136,9 +159,38 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
   try {
+    // 🔧 NOUVEAU : Gestion des nouvelles images uploadées
+    const updateData = { ...req.body };
+    
+    // Si de nouvelles images ont été uploadées
+    if (req.uploadedFiles) {
+      const { covers, pictures } = req.uploadedFiles;
+      
+      // 🗑️ Supprimer les anciennes images si nécessaire
+      const existingProject = await Project.findById(req.params.id);
+      if (existingProject) {
+        // Supprimer anciennes covers
+        if (covers && covers.length >= 2) {
+          if (existingProject.cover.small) deleteFile(existingProject.cover.small);
+          if (existingProject.cover.large) deleteFile(existingProject.cover.large);
+          
+          updateData.cover = {
+            small: covers.find(f => f.includes('_400')),
+            large: covers.find(f => f.includes('_1000'))
+          };
+        }
+        
+        // Supprimer anciennes pictures
+        if (pictures && pictures.length > 0) {
+          existingProject.pictures.forEach(pic => deleteFile(pic));
+          updateData.pictures = pictures;
+        }
+      }
+    }
+    
     const project = await Project.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       {
         new: true,
         runValidators: true
@@ -182,6 +234,16 @@ const deleteProject = async (req, res) => {
       });
     }
     
+    // 🗑️ NOUVEAU : Supprimer les fichiers images associés
+    if (project.cover) {
+      if (project.cover.small) deleteFile(project.cover.small);
+      if (project.cover.large) deleteFile(project.cover.large);
+    }
+    
+    if (project.pictures && project.pictures.length > 0) {
+      project.pictures.forEach(pic => deleteFile(pic));
+    }
+    
     await Project.findByIdAndDelete(req.params.id);
     
     res.status(200).json({
@@ -194,6 +256,20 @@ const deleteProject = async (req, res) => {
       message: 'Erreur lors de la suppression du projet',
       error: error.message
     });
+  }
+};
+
+/**
+ * 🛠️ FONCTION UTILITAIRE : Supprimer un fichier
+ */
+const deleteFile = (filePath) => {
+  try {
+    const fullPath = path.join(__dirname, '..', 'public', filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la suppression du fichier:', error);
   }
 };
 

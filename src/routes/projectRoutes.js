@@ -9,6 +9,9 @@ const {
   deleteProject
 } = require('../controllers/projectController');
 
+// 🔗 IMPORT DU MIDDLEWARE D'UPLOAD
+const { uploadProjectImages } = require('../middleware/uploadProject');
+
 const router = express.Router();
 
 // Routes publiques
@@ -17,9 +20,9 @@ router.get('/featured', getFeaturedProjects);
 router.get('/category/:category', getProjectsByCategory);
 router.get('/:id', getProjectById);
 
-// Routes privées (Admin)
-router.post('/', createProject);
-router.put('/:id', updateProject);
+// Routes privées (Admin) - AVEC UPLOAD MIDDLEWARE
+router.post('/', uploadProjectImages, createProject);
+router.put('/:id', uploadProjectImages, updateProject);
 router.delete('/:id', deleteProject);
 
 module.exports = router;

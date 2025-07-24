@@ -1,8 +1,8 @@
-// src/routes/userRoutes.js - MODIFICATION TEMPORAIRE
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
+const uploadAvatar = require('../middleware/uploadAvatar');
 
 // GET /api/user - Récupérer les infos utilisateur (PUBLIC)
 router.get('/', userController.getUser);
@@ -12,5 +12,8 @@ router.post('/', protect, userController.createUser)
 
 // PUT /api/user - Modifier l'utilisateur (PROTÉGÉ)
 router.put('/', protect, userController.updateUser);
+
+// PATCH /api/user/avatar - Upload avatar (PROTÉGÉ)
+router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
 
 module.exports = router;

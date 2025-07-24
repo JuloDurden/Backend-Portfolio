@@ -27,13 +27,14 @@ const skillSchema = new mongoose.Schema({
     }
   },
   icon: {
-    type: String,
-    required: [true, 'L\'icône est requise'],
-    validate: {
-      validator: function(v) {
-        return /^https?:\/\/.+/.test(v);
-      },
-      message: 'L\'icône doit être une URL valide'
+  type: String,
+  required: [true, 'L\'icône est requise'],
+  validate: {
+    validator: function(v) {
+      // Accepte URL OU chemin local
+      return /^https?:\/\/.+/.test(v) || /^uploads\/skills\/.+/.test(v);
+    },
+    message: 'L\'icône doit être une URL valide ou un chemin vers un fichier uploadé'
     }
   },
   categories: [{

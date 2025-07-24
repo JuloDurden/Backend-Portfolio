@@ -1,4 +1,20 @@
 const Experience = require('../models/Experience');
+const fs = require('fs');
+const path = require('path');
+
+// Fonction locale pour supprimer une image
+const deleteImage = (imagePath) => {
+  try {
+    if (!imagePath) return;
+    const fullPath = path.join(__dirname, '../../uploads', imagePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+      console.log(`✅ Image supprimée: ${imagePath}`);
+    }
+  } catch (error) {
+    console.error(`❌ Erreur suppression image:`, error);
+  }
+};
 
 const experienceController = {
   // GET /api/experiences - Récupérer toutes les expériences (PUBLIC)
@@ -8,11 +24,7 @@ const experienceController = {
       
       let query = {};
       if (type && type !== 'all') {
-        if (type === 'active') {
-          query.isCurrentlyActive = true;
-        } else {
-          query.type = type;
-        }
+        query.type = type; // 'work' ou 'education'
       }
 
       let sortCriteria = {};
@@ -20,8 +32,8 @@ const experienceController = {
         case 'oldest':
           sortCriteria = { startDate: 1 };
           break;
-        case 'title':
-          sortCriteria = { title: 1 };
+        case 'position':
+          sortCriteria = { position: 1 };
           break;
         case 'company':
           sortCriteria = { company: 1 };
@@ -34,10 +46,13 @@ const experienceController = {
 
       // Calculer les stats
       const stats = {
-        totalExperiences: await Experience.countDocuments({ type: 'experience' }),
-        totalFormations: await Experience.countDocuments({ type: 'formation' }),
+        totalWork: await Experience.countDocuments({ type: 'work' }),
+        totalEducation: await Experience.countDocuments({ type: 'education' }),
         totalCount: experiences.length,
-        activeExperiences: await Experience.countDocuments({ isCurrentlyActive: true })
+        currentJobs: await Experience.countDocuments({ 
+          type: 'work', 
+          endDate: null // En cours
+        })
       };
 
       res.json({
@@ -83,13 +98,29 @@ const experienceController = {
   createExperience: async (req, res) => {
     try {
       const {
-        type, title, company, location, startDate, endDate,
-        isCurrentlyActive, description, technologies, photo
+        type, position, company, location, startDate, endDate,
+        description, technologies
       } = req.body;
 
+      // VÉRIFICATION IMAGE OBLIGATOIRE
+      const image = req.uploadedFiles?.image;
+      if (!image) {
+        return res.status(400).json({
+          success: false,
+          message: 'Image obligatoire pour créer une expérience'
+        });
+      }
+
       const experience = new Experience({
-        type, title, company, location, startDate, endDate,
-        isCurrentlyActive, description, technologies, photo
+        type,
+        position,
+        company,
+        location,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        description: Array.isArray(description) ? description : [description],
+        technologies: Array.isArray(technologies) ? technologies : (technologies ? [technologies] : []),
+        image
       });
 
       await experience.save();
@@ -112,8 +143,8 @@ const experienceController = {
   updateExperience: async (req, res) => {
     try {
       const {
-        type, title, company, location, startDate, endDate,
-        isCurrentlyActive, description, technologies, photo
+        type, position, company, location, startDate, endDate,
+        description, technologies
       } = req.body;
 
       const experience = await Experience.findById(req.params.id);
@@ -125,10 +156,57 @@ const experienceController = {
         });
       }
 
-      Object.assign(experience, {
-        type, title, company, location, startDate, endDate,
-        isCurrentlyActive, description, technologies, photo
-      });
+      // Gestion de l'image
+      if (req.uploadedFiles?.image) {
+        if (experience.image) {
+          deleteImage(experience.image);
+        }
+        experience.image = req.uploadedFiles.image;
+      }
+
+      // ✅ MISE À JOUR SÉLECTIVE (seulement les champs fournis)
+      const updateFields = {};
+
+      if (type) updateFields.type = type;
+      if (position) updateFields.position = position;
+      if (company !== undefined) updateFields.company = company; // Peut être vide
+      if (location) updateFields.location = location;
+      
+      // ✅ VALIDATION DES DATES
+      if (startDate) {
+        const parsedStartDate = new Date(startDate);
+        if (!isNaN(parsedStartDate.getTime())) {
+          updateFields.startDate = parsedStartDate;
+        }
+      }
+      
+      if (endDate !== undefined) {
+        if (endDate) {
+          const parsedEndDate = new Date(endDate);
+          if (!isNaN(parsedEndDate.getTime())) {
+            updateFields.endDate = parsedEndDate;
+          }
+        } else {
+          updateFields.endDate = null; // Job actuel
+        }
+      }
+
+      // ✅ GESTION DESCRIPTION
+      if (description) {
+        updateFields.description = Array.isArray(description) 
+          ? description.filter(d => d && d.trim()) // Supprime les vides
+          : [description].filter(d => d && d.trim());
+      }
+
+      // ✅ GESTION TECHNOLOGIES  
+      if (technologies) {
+        updateFields.technologies = Array.isArray(technologies)
+          ? technologies.filter(t => t && t.trim()) // Supprime les vides
+          : [technologies].filter(t => t && t.trim());
+      }
+
+      // ✅ APPLICATION DES MISES À JOUR
+      Object.assign(experience, updateFields);
 
       await experience.save();
 
@@ -137,6 +215,7 @@ const experienceController = {
         data: experience,
         message: 'Expérience mise à jour avec succès'
       });
+      
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'expérience:', error);
       res.status(500).json({
@@ -156,6 +235,11 @@ const experienceController = {
           success: false,
           message: 'Expérience non trouvée'
         });
+      }
+
+      // Supprimer l'image avant de supprimer l'expérience
+      if (experience.image) {
+        deleteImage(experience.image);
       }
 
       await Experience.findByIdAndDelete(req.params.id);

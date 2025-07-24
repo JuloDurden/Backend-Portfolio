@@ -3,17 +3,17 @@ const mongoose = require('mongoose');
 const experienceSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['experience', 'formation'],
+    enum: ['work', 'education'],
     required: true
   },
-  title: {
+  position: {
     type: String,
     required: true,
     trim: true
   },
   company: {
     type: String,
-    required: true,
+    required: false, // Facultatif
     trim: true
   },
   location: {
@@ -22,31 +22,39 @@ const experienceSchema = new mongoose.Schema({
     trim: true
   },
   startDate: {
-    type: String,
+    type: Date,
     required: true
   },
   endDate: {
-    type: String,
-    default: null
-  },
-  isCurrentlyActive: {
-    type: Boolean,
-    default: false
+    type: Date,
+    required: false // Null si en cours
   },
   description: [{
     type: String,
+    required: true,
     trim: true
   }],
   technologies: [{
     type: String,
+    required: false,
     trim: true
   }],
-  photo: {
+  image: {
     type: String,
-    default: null
+    required: true // ← IMAGE OBLIGATOIRE ✅
   }
 }, {
   timestamps: true
 });
+
+// Virtual pour calculer le period au format frontend
+experienceSchema.virtual('period').get(function() {
+  const start = this.startDate.getFullYear();
+  const end = this.endDate ? this.endDate.getFullYear() : 'Présent';
+  return `${start} - ${end}`;
+});
+
+// Inclure les virtuals dans JSON
+experienceSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Experience', experienceSchema);

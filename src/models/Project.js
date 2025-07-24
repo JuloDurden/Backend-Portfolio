@@ -19,19 +19,29 @@ const projectSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Le sous-titre ne peut pas dépasser 200 caractères']
   },
+  
   cover: {
-    type: String,
-    required: [true, 'L\'image de couverture est requise']
+    small: {
+      type: String,
+      required: [true, 'L\'image de couverture 400x400 est requise']
+    },
+    large: {
+      type: String,
+      required: [true, 'L\'image de couverture 1000x1000 est requise']
+    }
   },
+  
   description: {
     type: String,
     required: [true, 'La description est requise'],
     maxlength: [5000, 'La description ne peut pas dépasser 5000 caractères']
   },
+  
   pictures: [{
     type: String,
     required: true
   }],
+  
   competences: [{
     type: String,
     required: true,
@@ -75,7 +85,6 @@ const projectSchema = new mongoose.Schema({
     required: true,
     trim: true
   }],
-  // Champs additionnels pour l'administration
   featured: {
     type: Boolean,
     default: false
@@ -96,12 +105,11 @@ const projectSchema = new mongoose.Schema({
 projectSchema.index({ featured: -1, order: 1, 'informations.date': -1 });
 projectSchema.index({ isVisible: 1 });
 
-// Méthode pour obtenir les projets visibles et triés
+// Méthodes existantes
 projectSchema.statics.getVisibleProjects = function() {
   return this.find({ isVisible: true }).sort({ featured: -1, order: 1, createdAt: -1 });
 };
 
-// Méthode pour obtenir les projets mis en avant
 projectSchema.statics.getFeaturedProjects = function() {
   return this.find({ featured: true, isVisible: true }).sort({ order: 1 });
 };

@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const fs = require('fs');
+const path = require('path');
 
 const userController = {
   // GET /api/user - Récupérer les infos user (PUBLIC)
@@ -127,6 +129,54 @@ const userController = {
       });
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur'
+      });
+    }
+  },
+
+  // PATCH /api/user/avatar - Upload avatar (PROTÉGÉ)
+  updateAvatar: async (req, res) => {
+    try {
+      const user = await User.findOne();
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+
+      // 🗑️ Supprimer l'ancien avatar s'il existe
+      if (user.profilePicture) {
+        const oldAvatarPath = path.join(__dirname, '..', user.profilePicture);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+
+      // 💾 Mettre à jour avec le nouvel avatar
+      const avatarPath = `uploads/avatars/${req.file.filename}`;
+      user.profilePicture = avatarPath;
+      await user.save();
+
+      // ✅ Réponse sans password
+      const userResponse = user.toObject();
+      delete userResponse.password;
+
+      res.json({
+        success: true,
+        data: userResponse,
+        message: 'Avatar mis à jour avec succès',
+        avatar: {
+          filename: req.file.filename,
+          path: avatarPath,
+          size: req.file.size
+        }
+      });
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
       res.status(500).json({
         success: false,
         message: 'Erreur serveur'

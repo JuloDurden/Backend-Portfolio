@@ -120,7 +120,20 @@ const getSkillById = async (req, res) => {
  */
 const createSkill = async (req, res) => {
   try {
-    const skill = await Skill.create(req.body);
+    // Génération ID unique
+    const skillId = 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const skillData = {
+      ...req.body,
+      id: skillId
+    };
+
+    // Si fichier uploadé, utiliser le chemin local
+    if (req.file) {
+      skillData.icon = req.file.path.replace(/\\/g, '/');
+    }
+    
+    const skill = await Skill.create(skillData);
     
     res.status(201).json({
       success: true,
@@ -136,6 +149,7 @@ const createSkill = async (req, res) => {
   }
 };
 
+
 /**
  * @desc    Modifier une compétence
  * @route   PUT /api/skills/:id
@@ -143,14 +157,7 @@ const createSkill = async (req, res) => {
  */
 const updateSkill = async (req, res) => {
   try {
-    const skill = await Skill.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
+    const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
       return res.status(404).json({
@@ -158,11 +165,39 @@ const updateSkill = async (req, res) => {
         message: 'Compétence non trouvée'
       });
     }
+
+    // Préparer les données de mise à jour
+    const updateData = { ...req.body };
+
+    // Si un nouveau fichier est uploadé
+    if (req.file) {
+      // Supprimer l'ancienne icône si c'était un fichier local
+      if (skill.icon && skill.icon.startsWith('uploads/skills/')) {
+        const fs = require('fs');
+        const oldIconPath = skill.icon;
+        if (fs.existsSync(oldIconPath)) {
+          fs.unlinkSync(oldIconPath);
+          console.log(`Ancienne icône supprimée : ${oldIconPath}`);
+        }
+      }
+      
+      // Utiliser la nouvelle icône
+      updateData.icon = req.file.path.replace(/\\/g, '/');
+    }
+
+    const updatedSkill = await Skill.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
     
     res.status(200).json({
       success: true,
       message: 'Compétence mise à jour avec succès',
-      data: skill
+      data: updatedSkill
     });
   } catch (error) {
     res.status(400).json({
@@ -187,6 +222,15 @@ const deleteSkill = async (req, res) => {
         success: false,
         message: 'Compétence non trouvée'
       });
+    }
+
+    // Supprimer le fichier icône si c'était un upload local
+    if (skill.icon && skill.icon.startsWith('uploads/skills/')) {
+      const fs = require('fs');
+      if (fs.existsSync(skill.icon)) {
+        fs.unlinkSync(skill.icon);
+        console.log(`Icône supprimée : ${skill.icon}`);
+      }
     }
     
     await Skill.findByIdAndDelete(req.params.id);

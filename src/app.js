@@ -35,8 +35,8 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 Static files (uploads)
-app.use('/uploads', express.static('uploads'));
+// 📁 Static files (uploads) - CHEMIN CORRIGÉ
+app.use('/uploads', express.static('public/uploads'));
 
 // 🏠 Route de test
 app.get('/', (req, res) => {
@@ -47,23 +47,46 @@ app.get('/', (req, res) => {
   });
 });
 
-// Routes (⚠️ APRÈS LES MIDDLEWARES! ⚠️)
+// ======= IMPORT DES ROUTES =======
 const skillRoutes = require('./routes/skillRoutes');
 const projectRoutes = require('./routes/projectRoutes');
-
-// Utilisation des routes
-app.use('/api/skills', skillRoutes);
-app.use('/api/projects', projectRoutes);
-
 const userRoutes = require('./routes/userRoutes');
 const experienceRoutes = require('./routes/experienceRoutes');
+const authRoutes = require('./routes/authRoutes');
 
-// Après les routes skills
+// 🔥 Import pour Upload Controller
+const multer = require('multer');
+const UploadController = require('./controllers/uploadController');
+
+// ⚡ Configuration Multer pour uploads
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 10 * 1024 * 1024, // 10MB max
+    files: 10 // Max 10 fichiers simultanés
+  }
+});
+
+// ======= UTILISATION DES ROUTES =======
+// Routes publiques
+app.use('/api/skills', skillRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/experiences', experienceRoutes);
-
-const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
+
+// 📸 ROUTES UPLOAD DIRECTES - TOUTES LES VARIANTES
+// Pour projets
+app.post('/api/upload/cover', upload.single('cover'), UploadController.uploadCover);
+app.post('/api/upload/pictures', upload.array('pictures', 10), UploadController.uploadPictures);
+
+// Pour skills - TOUTES LES VARIANTES POSSIBLES
+app.post('/api/upload/skill-icon', upload.single('icon'), UploadController.uploadSkillIcon);
+app.post('/api/upload/skills', upload.single('icon'), UploadController.uploadSkillIcon);
+app.post('/api/upload/skill-icons', upload.single('icon'), UploadController.uploadSkillIcon);
+
+// Nettoyage
+app.post('/api/upload/cleanup', UploadController.cleanup);
 
 // 🚫 Route 404
 app.all('*', (req, res) => {
@@ -77,7 +100,7 @@ app.all('*', (req, res) => {
 app.use(errorHandler);
 
 // 🌐 Démarrage du serveur
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000; // 🔄 CHANGÉ POUR TON PORT
 
 const server = app.listen(PORT, () => {
   console.log(`
@@ -85,6 +108,15 @@ const server = app.listen(PORT, () => {
 🌍 Environment: ${process.env.NODE_ENV}
 📱 API URL: http://localhost:${PORT}
 🎯 Frontend: ${process.env.FRONTEND_URL}
+📁 Uploads: http://localhost:${PORT}/uploads
+
+📸 Upload routes available:
+   • POST /api/upload/cover
+   • POST /api/upload/pictures  
+   • POST /api/upload/skill-icon
+   • POST /api/upload/skills
+   • POST /api/upload/skill-icons
+   • POST /api/upload/cleanup
   `);
 });
 
