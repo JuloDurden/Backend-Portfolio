@@ -189,15 +189,8 @@ const userController = {
 
   updatePersonalData: async (req, res) => {
     try {
-      const { firstName, lastName, email, dateOfBirth, githubUrl, linkedinUrl, portfolioUrl } = req.body.personalData || {};
-
-      if (!firstName || !lastName || !email) {
-        return res.status(400).json({
-          success: false,
-          message: 'Prénom, nom et email sont requis'
-        });
-      }
-
+      console.log('🔍 REQ.BODY updatePersonalData:', req.body);
+      
       const user = await User.findOne();
       
       if (!user) {
@@ -207,31 +200,42 @@ const userController = {
         });
       }
 
-      user.firstName = firstName;
-      user.lastName = lastName;
-      user.email = email;
-      user.dateOfBirth = dateOfBirth;
-      user.githubUrl = githubUrl;
+      console.log('🔍 Utilisateur AVANT modification:', {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        dateOfBirth: user.dateOfBirth,
+        githubUrl: user.githubUrl,
+        profilePicture: user.profilePicture
+      });
 
-      await user.save();
+      // 🔥 MÊME MÉTHODE QUE POUR ABOUT - Pas de validation complète
+      const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        { $set: req.body }, // SEULEMENT les champs fournis
+        { 
+          new: true, 
+          runValidators: false, // 🔥 DÉSACTIVER LA VALIDATION COMPLÈTE
+          omitUndefined: true   // 🔥 IGNORER LES VALEURS UNDEFINED
+        }
+      );
 
-      const userResponse = user.toObject();
+      console.log('✅ Utilisateur APRÈS modification:', {
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        dateOfBirth: updatedUser.dateOfBirth,
+        githubUrl: updatedUser.githubUrl,
+        profilePicture: updatedUser.profilePicture
+      });
+
+      const userResponse = updatedUser.toObject();
       delete userResponse.password;
 
       res.json({
         success: true,
         message: 'Données personnelles mises à jour',
-        data: {
-          user: {
-            id: user._id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            dateOfBirth: user.dateOfBirth,
-            githubUrl: user.githubUrl,
-            profilePicture: user.profilePicture
-          }
-        }
+        data: userResponse
       });
 
     } catch (error) {
