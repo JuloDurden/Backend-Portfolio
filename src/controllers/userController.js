@@ -182,9 +182,8 @@ const userController = {
         message: 'Erreur serveur'
       });
     }
-  }
+  },
 
-  // Ajout
   updatePersonalData: async (req, res) => {
     try {
       const { firstName, lastName, email, dateOfBirth, githubUrl } = req.body;
