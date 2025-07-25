@@ -271,7 +271,7 @@ const deleteSkill = async (req, res) => {
     }
     
     // 🔥 CORRIGÉ : findOneAndDelete
-    await Skill.findOneAndDelete({ id: req.params.id });
+    await Skill.findByIdAndDelete(req.params.id);
     
     console.log(`✅ Skill supprimée: ${skill.name}`);
     
