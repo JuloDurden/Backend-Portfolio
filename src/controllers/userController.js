@@ -183,6 +183,101 @@ const userController = {
       });
     }
   }
+
+  updatePersonalData: async (req, res) => {
+    try {
+      const { firstName, lastName, email, dateOfBirth, githubUrl } = req.body;
+
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Prénom, nom et email sont requis'
+        });
+      }
+
+      const user = await User.findOne();
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+
+      user.firstName = firstName;
+      user.lastName = lastName;
+      user.email = email;
+      user.dateOfBirth = dateOfBirth;
+      user.githubUrl = githubUrl;
+
+      await user.save();
+
+      const userResponse = user.toObject();
+      delete userResponse.password;
+
+      res.json({
+        success: true,
+        message: 'Données personnelles mises à jour',
+        data: {
+          user: {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            dateOfBirth: user.dateOfBirth,
+            githubUrl: user.githubUrl,
+            profilePicture: user.profilePicture
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Erreur updatePersonalData:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur'
+      });
+    }
+  },
+
+  updateAboutData: async (req, res) => {
+    try {
+      const { currentJob, introductionParagraph, journeyParagraph, goalsParagraph, hobbies } = req.body;
+
+      const user = await User.findOne();
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+
+      user.currentJob = currentJob;
+      user.introductionParagraph = introductionParagraph;
+      user.journeyParagraph = journeyParagraph;
+      user.goalsParagraph = goalsParagraph;
+      user.hobbies = hobbies;
+
+      await user.save();
+
+      const userResponse = user.toObject();
+      delete userResponse.password;
+
+      res.json({
+        success: true,
+        message: 'Section À propos mise à jour',
+        data: userResponse
+      });
+
+    } catch (error) {
+      console.error('Erreur updateAboutData:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur'
+      });
+    }
+  }
 };
 
 module.exports = userController;

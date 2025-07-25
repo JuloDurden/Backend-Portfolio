@@ -4,16 +4,14 @@ const userController = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
 const uploadAvatar = require('../middleware/uploadAvatar');
 
-// GET /api/user - Récupérer les infos utilisateur (PUBLIC)
+// Routes existantes
 router.get('/', userController.getUser);
-
-// POST /api/user - Créer un utilisateur (PORTÉGÉ)
-router.post('/', protect, userController.createUser)
-
-// PUT /api/user - Modifier l'utilisateur (PROTÉGÉ)
+router.post('/', protect, userController.createUser);
 router.put('/', protect, userController.updateUser);
-
-// PATCH /api/user/avatar - Upload avatar (PROTÉGÉ)
 router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
+
+// 🆕 NOUVELLES ROUTES SPÉCIFIQUES
+router.put('/personal', protect, userController.updatePersonalData);
+router.put('/about', protect, userController.updateAboutData);
 
 module.exports = router;
