@@ -186,7 +186,7 @@ const userController = {
 
   updatePersonalData: async (req, res) => {
     try {
-      const { firstName, lastName, email, dateOfBirth, githubUrl } = req.body;
+      const { firstName, lastName, email, dateOfBirth, githubUrl, linkedinUrl, portfolioUrl } = req.body.personalData || {};
 
       if (!firstName || !lastName || !email) {
         return res.status(400).json({
