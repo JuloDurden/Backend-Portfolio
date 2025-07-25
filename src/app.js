@@ -46,31 +46,51 @@ app.use(express.urlencoded({ extended: true }));
 
 // 📁 ROUTE DÉDIÉE POUR SERVIR LES FICHIERS UPLOADÉS
 app.get('/uploads/*', (req, res) => {
-  const filePath = path.join(__dirname, req.path);
-  console.log('🖼️ Tentative accès fichier:', filePath);
+  // ESSAYER PLUSIEURS CHEMINS POSSIBLES
+  const possiblePaths = [
+    path.join(__dirname, req.path),           // /app/src/uploads/...
+    path.join(__dirname, '..', req.path),     // /app/uploads/...
+    path.join(process.cwd(), req.path),       // /app/uploads/...
+    path.join('/app', req.path)               // /app/uploads/...
+  ];
   
-  // Vérifier si le fichier existe
-  fs.access(filePath, fs.constants.F_OK, (err) => {
-    if (err) {
-      console.error('❌ Fichier non trouvé:', filePath);
+  console.log('🔍 Chemins testés:', possiblePaths);
+  
+  // Fonction pour tester chaque chemin
+  const tryNextPath = (index) => {
+    if (index >= possiblePaths.length) {
+      console.error('❌ AUCUN FICHIER TROUVÉ dans tous les chemins');
       return res.status(404).json({ 
         success: false, 
         message: 'Fichier non trouvé',
-        path: req.path 
+        path: req.path,
+        tried: possiblePaths
       });
     }
     
-    // Servir le fichier
-    res.sendFile(filePath, (sendErr) => {
-      if (sendErr) {
-        console.error('❌ Erreur envoi fichier:', sendErr);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Erreur lors de l\'envoi du fichier' 
+    const currentPath = possiblePaths[index];
+    console.log(`🧪 Test chemin ${index + 1}:`, currentPath);
+    
+    fs.access(currentPath, fs.constants.F_OK, (err) => {
+      if (err) {
+        console.log(`❌ Pas trouvé: ${currentPath}`);
+        tryNextPath(index + 1); // Essayer le suivant
+      } else {
+        console.log(`✅ TROUVÉ: ${currentPath}`);
+        res.sendFile(currentPath, (sendErr) => {
+          if (sendErr) {
+            console.error('❌ Erreur envoi fichier:', sendErr);
+            res.status(500).json({ 
+              success: false, 
+              message: 'Erreur lors de l\'envoi du fichier' 
+            });
+          }
         });
       }
     });
-  });
+  };
+  
+  tryNextPath(0); // Commencer par le premier chemin
 });
 
 // 🏠 Route de test
@@ -138,19 +158,36 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-  // Créer le dossier uploads s'il n'existe pas
-  const uploadsDir = path.join(__dirname, 'uploads');
-  const skillsDir = path.join(__dirname, 'uploads/skills');
+  // ESSAYER DE CRÉER LE DOSSIER UPLOADS DANS TOUS LES ENDROITS POSSIBLES
+  const possibleUploadsDirs = [
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, '..', 'uploads'),
+    path.join(process.cwd(), 'uploads'),
+    path.join('/app', 'uploads')
+  ];
   
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('📁 Dossier uploads créé');
-  }
-  
-  if (!fs.existsSync(skillsDir)) {
-    fs.mkdirSync(skillsDir, { recursive: true });
-    console.log('📁 Dossier skills créé');
-  }
+  console.log('🔍 Tentative création dossiers uploads dans:');
+  possibleUploadsDirs.forEach((dir, index) => {
+    console.log(`${index + 1}. ${dir}`);
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`✅ Dossier créé: ${dir}`);
+      } else {
+        console.log(`📁 Dossier existe: ${dir}`);
+      }
+      
+      const skillsDir = path.join(dir, 'skills');
+      if (!fs.existsSync(skillsDir)) {
+        fs.mkdirSync(skillsDir, { recursive: true });
+        console.log(`✅ Dossier skills créé: ${skillsDir}`);
+      } else {
+        console.log(`📁 Dossier skills existe: ${skillsDir}`);
+      }
+    } catch (error) {
+      console.log(`❌ Erreur création ${dir}:`, error.message);
+    }
+  });
 
   console.log(`
 🚀 Server running on port ${PORT}
@@ -158,7 +195,8 @@ const server = app.listen(PORT, () => {
 📱 API URL: http://localhost:${PORT}
 🎯 Frontend: ${process.env.FRONTEND_URL}
 📁 Uploads: http://localhost:${PORT}/uploads
-📂 Uploads directory: ${uploadsDir}
+📂 __dirname: ${__dirname}
+📂 process.cwd(): ${process.cwd()}
 
 📸 Upload routes available:
    • POST /api/upload/cover
