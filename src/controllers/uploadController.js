@@ -3,6 +3,7 @@ const ImageProcessor = require('../utils/imageProcessor'); // ✅ minuscule comm
 const mime = require('mime-types');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs'); // Pour les opérations synchrones
 
 class UploadController {
   
@@ -185,11 +186,16 @@ class UploadController {
     }
   }
   
-  // Upload icône skill (1 fichier → direct ou PNG optimisé)
+  // 🔥 Upload icône skill - VERSION AVEC LOGS DEBUG
   static async uploadSkillIcon(req, res) {
     try {
+      console.log('🚀 DÉBUT UPLOAD SKILL ICON');
+      console.log('📁 __dirname:', __dirname);
+      console.log('📁 process.cwd():', process.cwd());
+      
       // Vérification fichier
       if (!req.file) {
+        console.log('❌ Aucun fichier reçu');
         return res.status(400).json({ 
           error: 'Aucune icône fournie',
           code: 'NO_FILE'
@@ -198,14 +204,15 @@ class UploadController {
       
       const { originalname, mimetype, buffer, size } = req.file;
       
-      console.log('🎨 Upload skill icon:', {
-        filename: originalname,
-        mimetype: mimetype,
+      console.log('📄 Fichier reçu:', {
+        originalname,
+        mimetype,
         size: `${Math.round(size / 1024)}KB`
       });
       
       // Validation type MIME
       if (!UploadController.validateSkillIcon(mimetype)) {
+        console.log('❌ Type MIME invalide:', mimetype);
         return res.status(400).json({ 
           error: `Type de fichier non autorisé pour icône: ${mimetype}`,
           code: 'INVALID_MIME_TYPE',
@@ -215,39 +222,106 @@ class UploadController {
       
       // Validation taille (2MB max pour les icônes)
       if (size > 2 * 1024 * 1024) {
+        console.log('❌ Fichier trop volumineux:', size);
         return res.status(400).json({ 
           error: 'Icône trop volumineux (2MB maximum)',
           code: 'FILE_TOO_LARGE',
           size: `${Math.round(size / 1024 / 1024)}MB`
         });
       }
+
+      // 🔧 GÉNÉRER NOM UNIQUE
+      const fileExtension = path.extname(originalname);
+      const fileName = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 15)}${fileExtension}`;
+      console.log('📝 Nom de fichier généré:', fileName);
       
-      // Traitement
-      console.log('🔄 Traitement icône en cours...');
-      const startTime = Date.now();
+      // 🔍 ESSAYER TOUS LES CHEMINS POSSIBLES POUR SAUVEGARDER
+      const possibleDirs = [
+        path.join(__dirname, '..', 'uploads', 'skills'),
+        path.join(__dirname, '..', '..', 'uploads', 'skills'),
+        path.join(process.cwd(), 'uploads', 'skills'),
+        path.join('/app', 'uploads', 'skills'),
+        path.join('/app', 'src', 'uploads', 'skills')
+      ];
+
+      console.log('🔍 Dossiers possibles pour sauvegarde:', possibleDirs);
+
+      let savedPath = null;
+      let workingDir = null;
       
-      const iconUrl = await ImageProcessor.processSkillIcon(buffer, originalname, mimetype);
+      for (const dir of possibleDirs) {
+        try {
+          console.log(`🧪 Test création dossier: ${dir}`);
+          
+          // Créer le dossier s'il n'existe pas
+          if (!fsSync.existsSync(dir)) {
+            fsSync.mkdirSync(dir, { recursive: true });
+            console.log(`✅ Dossier créé: ${dir}`);
+          } else {
+            console.log(`📁 Dossier existe déjà: ${dir}`);
+          }
+          
+          const filePath = path.join(dir, fileName);
+          console.log(`💾 Tentative sauvegarde: ${filePath}`);
+          
+          // Essayer de sauvegarder le fichier
+          fsSync.writeFileSync(filePath, buffer);
+          
+          // Vérifier que le fichier a été créé
+          if (fsSync.existsSync(filePath)) {
+            const stats = fsSync.statSync(filePath);
+            console.log(`🎉 FICHIER SAUVÉ AVEC SUCCÈS: ${filePath}`);
+            console.log(`📊 Taille fichier sauvé: ${stats.size} bytes`);
+            savedPath = filePath;
+            workingDir = dir;
+            break;
+          }
+          
+        } catch (error) {
+          console.log(`❌ Erreur avec ${dir}:`, error.message);
+          continue;
+        }
+      }
+
+      if (!savedPath) {
+        console.error('❌ IMPOSSIBLE DE SAUVEGARDER LE FICHIER NULLE PART !');
+        return res.status(500).json({
+          success: false,
+          error: 'Erreur lors de la sauvegarde du fichier',
+          code: 'SAVE_ERROR',
+          triedPaths: possibleDirs
+        });
+      }
+
+      // 🔗 GÉNÉRER L'URL
+      const fileUrl = `/uploads/skills/${fileName}`;
+      const fullUrl = `${req.protocol}://${req.get('host')}${fileUrl}`;
       
-      const processingTime = Date.now() - startTime;
-      console.log(`✅ Icône traitée en ${processingTime}ms`);
-      
-      // Réponse succès
+      console.log('🔗 URL générée:', fileUrl);
+      console.log('🔗 URL complète:', fullUrl);
+      console.log('🏠 Dossier de travail:', workingDir);
+
+      // ✅ RÉPONSE SUCCÈS
       res.json({
         success: true,
         message: 'Icône uploadée avec succès',
-        icon: iconUrl,
+        icon: fileUrl,
+        url: fileUrl, // Pour compatibilité
+        fullUrl: fullUrl,
         metadata: {
           originalName: originalname,
+          fileName: fileName,
           originalSize: `${Math.round(size / 1024)}KB`,
-          processingTime: `${processingTime}ms`,
           format: mimetype === 'image/svg+xml' ? 'svg' : 'png',
-          optimized: mimetype !== 'image/svg+xml'
+          savedPath: savedPath,
+          workingDir: workingDir
         }
       });
       
     } catch (error) {
-      console.error('❌ Erreur upload skill icon:', error);
+      console.error('💥 ERREUR UPLOAD SKILL ICON:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Erreur serveur lors du traitement de l\'icône',
         code: 'PROCESSING_ERROR',
         details: error.message
@@ -264,26 +338,39 @@ class UploadController {
       
       console.log('📋 Fichiers à garder:', filesToKeep);
 
-      // 🔧 CORRECTION : Chemin sans "src"
-      const uploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads');
+      // 🔧 ESSAYER PLUSIEURS CHEMINS UPLOADS POSSIBLES
+      const possibleUploadsDirs = [
+        path.join(__dirname, '..', 'uploads'),
+        path.join(__dirname, '..', '..', 'uploads'),
+        path.join(process.cwd(), 'uploads'),
+        path.join('/app', 'uploads'),
+        path.join('/app', 'src', 'uploads'),
+        path.join(__dirname, '..', '..', 'public', 'uploads') // Ancien chemin
+      ];
       
-      // 🔍 Debug du chemin
-      console.log('📁 Chemin uploads:', uploadsDir);
+      let uploadsDir = null;
       
-      // Vérifier que le dossier existe
-      try {
-        const stats = await fs.stat(uploadsDir);
-        if (!stats.isDirectory()) {
-          throw new Error('Le chemin uploads n\'est pas un dossier');
+      // Trouver le bon dossier uploads
+      for (const dir of possibleUploadsDirs) {
+        try {
+          const stats = await fs.stat(dir);
+          if (stats.isDirectory()) {
+            console.log('✅ Dossier uploads trouvé:', dir);
+            uploadsDir = dir;
+            break;
+          }
+        } catch (error) {
+          console.log('❌ Dossier non trouvé:', dir);
+          continue;
         }
-        console.log('✅ Dossier uploads trouvé !');
-      } catch (pathError) {
-        console.error('❌ Dossier uploads introuvable:', uploadsDir);
+      }
+      
+      if (!uploadsDir) {
+        console.error('❌ Aucun dossier uploads trouvé !');
         return res.status(500).json({
           success: false,
           message: 'Dossier uploads introuvable',
-          path: uploadsDir,
-          error: pathError.message
+          triedPaths: possibleUploadsDirs
         });
       }
 
@@ -305,7 +392,7 @@ class UploadController {
             } else if (item.isFile()) {
               // Convertir le chemin en URL relative (compatible Windows/Linux)
               const relativePath = fullPath
-                .replace(path.join(__dirname, '..', '..', 'public'), '') // 🔧 CORRECTION
+                .replace(uploadsDir, '/uploads')
                 .replace(/\\/g, '/');
               
               console.log(`📁 Fichier trouvé: ${relativePath}`);
@@ -359,7 +446,8 @@ class UploadController {
           keptFiles,
           totalDeleted: deletedFiles.length,
           totalKept: keptFiles.length,
-          spaceFreed: formatSize(totalSize)
+          spaceFreed: formatSize(totalSize),
+          uploadsDir: uploadsDir
         }
       });
 
