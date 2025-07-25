@@ -257,27 +257,34 @@ const userController = {
         });
       }
 
-      // 🎯 MERGER AVEC LES DONNÉES EXISTANTES (ne perdre aucune donnée)
-      const updatedData = {
-        // Garder les valeurs actuelles
-        currentJob: user.currentJob || '',
-        introductionParagraph: user.introductionParagraph || '',
-        journeyParagraph: user.journeyParagraph || '',
-        goalsParagraph: user.goalsParagraph || '',
-        hobbies: user.hobbies || [],
-        // Écraser SEULEMENT avec les nouvelles valeurs fournies
-        ...req.body
-      };
+      console.log('🔍 Utilisateur AVANT modification:', {
+        currentJob: user.currentJob,
+        introductionParagraph: user.introductionParagraph,
+        journeyParagraph: user.journeyParagraph,
+        goalsParagraph: user.goalsParagraph,
+        hobbies: user.hobbies
+      });
 
-      console.log('🔍 Données après merge:', updatedData);
+      // 🎯 MÉTHODE SÛRE - findByIdAndUpdate avec validation partielle
+      const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        { $set: req.body }, // SEULEMENT les champs fournis
+        { 
+          new: true, 
+          runValidators: false, // 🔥 DÉSACTIVER LA VALIDATION COMPLÈTE
+          omitUndefined: true   // 🔥 IGNORER LES VALEURS UNDEFINED
+        }
+      );
 
-      // 💾 APPLIQUER LES CHANGEMENTS
-      Object.assign(user, updatedData);
-      await user.save();
+      console.log('✅ Utilisateur APRÈS modification:', {
+        currentJob: updatedUser.currentJob,
+        introductionParagraph: updatedUser.introductionParagraph,
+        journeyParagraph: updatedUser.journeyParagraph,
+        goalsParagraph: updatedUser.goalsParagraph,
+        hobbies: updatedUser.hobbies
+      });
 
-      console.log('✅ Utilisateur mis à jour avec succès');
-
-      const userResponse = user.toObject();
+      const userResponse = updatedUser.toObject();
       delete userResponse.password;
 
       res.json({
