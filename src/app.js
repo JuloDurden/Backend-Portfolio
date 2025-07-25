@@ -42,8 +42,8 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 Static files (uploads) - CHEMIN CORRIGÉ
-app.use('/uploads', express.static('public/uploads'));
+// 📁 Static files (uploads)
+app.use('/uploads', express.static('uploads'));
 
 // 🏠 Route de test
 app.get('/', (req, res) => {

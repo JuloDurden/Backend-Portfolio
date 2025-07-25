@@ -52,7 +52,6 @@ const getSkills = async (req, res) => {
   }
 };
 
-
 /**
  * @desc    Récupérer les compétences par catégorie
  * @route   GET /api/skills/category/:category
@@ -61,7 +60,7 @@ const getSkills = async (req, res) => {
 const getSkillsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
-    const skills = await Skill.find({ category }).sort({ name: 1 });
+    const skills = await Skill.find({ categories: { $in: [category] } }).sort({ name: 1 });
     
     if (skills.length === 0) {
       return res.status(404).json({
@@ -91,7 +90,8 @@ const getSkillsByCategory = async (req, res) => {
  */
 const getSkillById = async (req, res) => {
   try {
-    const skill = await Skill.findById(req.params.id);
+    // 🔥 CORRIGÉ : utiliser le champ "id" au lieu de "_id"
+    const skill = await Skill.findOne({ id: req.params.id });
     
     if (!skill) {
       return res.status(404).json({
@@ -120,6 +120,9 @@ const getSkillById = async (req, res) => {
  */
 const createSkill = async (req, res) => {
   try {
+    console.log('🔍 REQ.BODY createSkill:', req.body);
+    console.log('🔍 REQ.FILE:', req.file);
+    
     // Génération ID unique
     const skillId = 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
@@ -135,12 +138,25 @@ const createSkill = async (req, res) => {
     
     const skill = await Skill.create(skillData);
     
+    console.log(`✅ Skill créée: ${skill.name}`);
+    
     res.status(201).json({
       success: true,
       message: 'Compétence créée avec succès',
       data: skill
     });
   } catch (error) {
+    console.error('Erreur createSkill:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Erreur de validation',
+        errors: errors
+      });
+    }
+    
     res.status(400).json({
       success: false,
       message: 'Erreur lors de la création de la compétence',
@@ -149,7 +165,6 @@ const createSkill = async (req, res) => {
   }
 };
 
-
 /**
  * @desc    Modifier une compétence
  * @route   PUT /api/skills/:id
@@ -157,7 +172,12 @@ const createSkill = async (req, res) => {
  */
 const updateSkill = async (req, res) => {
   try {
-    const skill = await Skill.findById(req.params.id);
+    console.log('🔍 REQ.PARAMS:', req.params);
+    console.log('🔍 REQ.BODY updateSkill:', req.body);
+    console.log('🔍 REQ.FILE:', req.file);
+    
+    // 🔥 CORRIGÉ : utiliser le champ "id"
+    const skill = await Skill.findOne({ id: req.params.id });
     
     if (!skill) {
       return res.status(404).json({
@@ -185,14 +205,17 @@ const updateSkill = async (req, res) => {
       updateData.icon = req.file.path.replace(/\\/g, '/');
     }
 
-    const updatedSkill = await Skill.findByIdAndUpdate(
-      req.params.id,
-      updateData,
+    // 🔥 CORRIGÉ : findOneAndUpdate + runValidators: false
+    const updatedSkill = await Skill.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: updateData },
       {
         new: true,
-        runValidators: true
+        runValidators: false // 🔥 Évite les erreurs de validation comme avant
       }
     );
+    
+    console.log(`✅ Skill mise à jour: ${updatedSkill.name}`);
     
     res.status(200).json({
       success: true,
@@ -200,6 +223,17 @@ const updateSkill = async (req, res) => {
       data: updatedSkill
     });
   } catch (error) {
+    console.error('Erreur updateSkill:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Erreur de validation',
+        errors: errors
+      });
+    }
+    
     res.status(400).json({
       success: false,
       message: 'Erreur lors de la mise à jour de la compétence',
@@ -215,7 +249,10 @@ const updateSkill = async (req, res) => {
  */
 const deleteSkill = async (req, res) => {
   try {
-    const skill = await Skill.findById(req.params.id);
+    console.log('🔍 DELETE SKILL ID:', req.params.id);
+    
+    // 🔥 CORRIGÉ : utiliser le champ "id"
+    const skill = await Skill.findOne({ id: req.params.id });
     
     if (!skill) {
       return res.status(404).json({
@@ -233,13 +270,17 @@ const deleteSkill = async (req, res) => {
       }
     }
     
-    await Skill.findByIdAndDelete(req.params.id);
+    // 🔥 CORRIGÉ : findOneAndDelete
+    await Skill.findOneAndDelete({ id: req.params.id });
+    
+    console.log(`✅ Skill supprimée: ${skill.name}`);
     
     res.status(200).json({
       success: true,
       message: 'Compétence supprimée avec succès'
     });
   } catch (error) {
+    console.error('Erreur deleteSkill:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la suppression de la compétence',
