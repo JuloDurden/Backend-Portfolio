@@ -23,13 +23,15 @@ const Skill = require('./models/Skill');
 
 // 🛡️ Middlewares de sécurité (AVANT LES ROUTES!)
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // 🔧 Pour les images
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // 🔧 Pour les images
+  contentSecurityPolicy: false // 🔧 Désactive CSP pour les uploads
 }));
 
 app.use(cors({
   origin: [
     'http://localhost:5173',  // npm run dev
     'http://localhost:4173',  // npm run preview  
+    'https://portfolio-frontend-olive-seven.vercel.app', // 🔧 URL Vercel directe
     process.env.FRONTEND_VERCEL_URL,
     process.env.FRONTEND_URL  // production
   ].filter(Boolean), // Supprime les undefined
@@ -38,68 +40,94 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 📊 Logging (plus discret en production)
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+// 📊 Logging réduit pour éviter le spam
+app.use(morgan('tiny')); // Plus simple que 'combined'
 
 // 📦 Parsing du body (AVANT LES ROUTES!)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🎯 ROUTE CORRIGÉE POUR SERVIR LES FICHIERS - Railway Style
+// 🎯 ROUTE OPTIMISÉE POUR SERVIR LES FICHIERS - Railway Style
 app.use('/uploads', express.static('/app/uploads', {
-  maxAge: '1d', // Cache 1 jour
-  etag: false,
-  lastModified: false,
+  maxAge: '7d', // Cache 7 jours (plus long)
+  etag: true, // 🔧 Réactive etag pour le cache
+  lastModified: true,
   dotfiles: 'deny',
-  index: false, // Pas de listing des dossiers
-  setHeaders: (res, path) => {
-    // 🔧 Headers spécifiques pour les images
-    if (path.endsWith('.svg')) {
+  index: false,
+  setHeaders: (res, filePath) => {
+    // 🔧 Headers optimisés pour images
+    if (filePath.endsWith('.svg')) {
       res.setHeader('Content-Type', 'image/svg+xml');
+    } else if (filePath.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
     }
+    
+    // CORS pour toutes les images
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    
+    // 🚀 Cache optimisé
+    res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 jours
   }
 }));
 
 // 🔍 Route d'info pour debug (temporaire)
 app.get('/debug/uploads', (req, res) => {
-  const uploadPaths = [
-    '/app/uploads',
-    '/app/src/uploads',
-    path.join(__dirname, 'uploads'),
-    path.join(__dirname, '..', 'uploads')
-  ];
+  const skillsDir = '/app/uploads/skills';
+  const projectsDir = '/app/uploads/projects';
   
-  const info = uploadPaths.map(p => {
-    try {
-      const exists = fs.existsSync(p);
-      let files = [];
-      if (exists && fs.existsSync(path.join(p, 'skills'))) {
-        files = fs.readdirSync(path.join(p, 'skills'));
-      }
-      return { path: p, exists, skillsFiles: files };
-    } catch (error) {
-      return { path: p, exists: false, error: error.message };
-    }
-  });
-  
-  res.json({ uploadPaths: info, NODE_ENV: process.env.NODE_ENV });
+  try {
+    const skillsExists = fs.existsSync(skillsDir);
+    const projectsExists = fs.existsSync(projectsDir);
+    
+    const skillFiles = skillsExists ? fs.readdirSync(skillsDir) : [];
+    const projectFiles = projectsExists ? fs.readdirSync(projectsDir) : [];
+    
+    res.json({
+      success: true,
+      paths: {
+        skills: {
+          path: skillsDir,
+          exists: skillsExists,
+          files: skillFiles,
+          count: skillFiles.length
+        },
+        projects: {
+          path: projectsDir,
+          exists: projectsExists,
+          files: projectFiles,
+          count: projectFiles.length
+        }
+      },
+      NODE_ENV: process.env.NODE_ENV,
+      // 🔧 URLs de test
+      testUrls: skillFiles.slice(0, 2).map(file => ({
+        file,
+        url: `/uploads/skills/${file}`,
+        fullUrl: `${req.protocol}://${req.get('host')}/uploads/skills/${file}`
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // 🏠 Route de test
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 Portfolio API is running!',
-    version: '1.0.0',
-    documentation: '/api/docs'
+    version: '2.0.0',
+    documentation: '/api/docs',
+    debug: '/debug/uploads'
   });
 });
 
-// 🔧 Test direct d'un fichier skill (pour debug)
+// 🔧 Test direct d'un fichier skill (ROUTE CORRIGÉE)
 app.get('/test-skill-image', (req, res) => {
   const skillsDir = '/app/uploads/skills';
   try {
@@ -107,18 +135,31 @@ app.get('/test-skill-image', (req, res) => {
       const files = fs.readdirSync(skillsDir);
       if (files.length > 0) {
         const firstFile = files[0];
+        const fullUrl = `${req.protocol}://${req.get('host')}/uploads/skills/${firstFile}`;
+        
         return res.json({
           success: true,
-          message: 'Fichier trouvé',
+          message: 'Fichier trouvé ✅',
           file: firstFile,
-          url: `/uploads/skills/${firstFile}`,
-          fullUrl: `${req.protocol}://${req.get('host')}/uploads/skills/${firstFile}`
+          relativeUrl: `/uploads/skills/${firstFile}`,
+          fullUrl: fullUrl,
+          totalFiles: files.length,
+          allFiles: files.slice(0, 5) // 5 premiers fichiers
         });
       }
     }
-    res.json({ success: false, message: 'Aucun fichier skill trouvé' });
+    res.status(404).json({ 
+      success: false, 
+      message: 'Aucun fichier skill trouvé',
+      directory: skillsDir,
+      exists: fs.existsSync(skillsDir)
+    });
   } catch (error) {
-    res.json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      directory: skillsDir
+    });
   }
 });
 
@@ -133,7 +174,7 @@ const authRoutes = require('./routes/authRoutes');
 const multer = require('multer');
 const UploadController = require('./controllers/uploadController');
 
-// ⚡ Configuration Multer pour uploads
+// ⚡ Configuration Multer OPTIMISÉE
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { 
@@ -141,12 +182,10 @@ const upload = multer({
     files: 10 // Max 10 fichiers simultanés
   },
   fileFilter: (req, file, cb) => {
-    // 🔍 Log du fichier reçu
-    console.log('🔍 Fichier reçu:', {
-      fieldname: file.fieldname,
-      originalname: file.originalname,
-      mimetype: file.mimetype
-    });
+    // 🔍 Log réduit (évite le spam)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📁 Upload:', file.originalname, file.mimetype);
+    }
     cb(null, true);
   }
 });
@@ -172,60 +211,58 @@ app.post('/api/upload/skill-icons', upload.single('icon'), UploadController.uplo
 // Nettoyage
 app.post('/api/upload/cleanup', UploadController.cleanup);
 
-// 🚫 Route 404 POUR LES API SEULEMENT (laisse /uploads tranquille)
+// 🔥 Middleware de gestion d'erreurs (AVANT la route 404)
+app.use(errorHandler);
+
+// 🚫 Route 404 POUR LES API SEULEMENT - DÉPLACÉE APRÈS errorHandler
 app.all('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `API Route ${req.originalUrl} not found`
+    message: `API Route ${req.originalUrl} not found`,
+    availableRoutes: [
+      '/api/skills',
+      '/api/projects', 
+      '/api/upload/skill-icon',
+      '/debug/uploads',
+      '/test-skill-image'
+    ]
   });
 });
-
-// 🔥 Middleware de gestion d'erreurs
-app.use(errorHandler);
 
 // 🌐 Démarrage du serveur
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-  // 🎯 CRÉATION FORCÉE DU DOSSIER PRINCIPAL SUR RAILWAY
+  // 🎯 INITIALISATION OPTIMISÉE DES DOSSIERS
   const mainUploadDir = '/app/uploads';
   const skillsUploadDir = '/app/uploads/skills';
   const projectsUploadDir = '/app/uploads/projects';
   
-  console.log('🚀 Initialisation des dossiers uploads sur Railway...');
+  console.log('🚀 Initialisation des dossiers uploads...');
   
   try {
-    // Créer le dossier principal
-    if (!fs.existsSync(mainUploadDir)) {
-      fs.mkdirSync(mainUploadDir, { recursive: true });
-      console.log(`✅ Dossier principal créé: ${mainUploadDir}`);
-    } else {
-      console.log(`📁 Dossier principal existe: ${mainUploadDir}`);
-    }
-    
-    // Créer le sous-dossier skills
-    if (!fs.existsSync(skillsUploadDir)) {
-      fs.mkdirSync(skillsUploadDir, { recursive: true });
-      console.log(`✅ Dossier skills créé: ${skillsUploadDir}`);
-    } else {
-      console.log(`📁 Dossier skills existe: ${skillsUploadDir}`);
-    }
-    
-    // Créer le sous-dossier projects
-    if (!fs.existsSync(projectsUploadDir)) {
-      fs.mkdirSync(projectsUploadDir, { recursive: true });
-      console.log(`✅ Dossier projects créé: ${projectsUploadDir}`);
-    } else {
-      console.log(`📁 Dossier projects existe: ${projectsUploadDir}`);
-    }
-    
-    // Vérifier les fichiers existants
-    if (fs.existsSync(skillsUploadDir)) {
-      const skillFiles = fs.readdirSync(skillsUploadDir);
-      console.log(`📄 Fichiers skills trouvés: ${skillFiles.length}`);
-      if (skillFiles.length > 0) {
-        console.log(`📄 Premier fichier: ${skillFiles[0]}`);
+    // Créer tous les dossiers
+    [mainUploadDir, skillsUploadDir, projectsUploadDir].forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`✅ Dossier créé: ${dir}`);
       }
+    });
+    
+    // 🔧 COMPTAGE CORRIGÉ
+    const skillFiles = fs.existsSync(skillsUploadDir) 
+      ? fs.readdirSync(skillsUploadDir) 
+      : [];
+    
+    const projectFiles = fs.existsSync(projectsUploadDir) 
+      ? fs.readdirSync(projectsUploadDir) 
+      : [];
+    
+    console.log(`📄 Skills: ${skillFiles.length} fichiers`);
+    console.log(`📄 Projects: ${projectFiles.length} fichiers`);
+    
+    if (skillFiles.length > 0) {
+      console.log(`📄 Premier skill: ${skillFiles[0]}`);
     }
     
   } catch (error) {
@@ -235,20 +272,14 @@ const server = app.listen(PORT, () => {
   console.log(`
 🚀 Server running on port ${PORT}
 🌍 Environment: ${process.env.NODE_ENV}
-📱 API URL: http://localhost:${PORT}
-🎯 Frontend: ${process.env.FRONTEND_URL}
-📁 Uploads: http://localhost:${PORT}/uploads
 📂 Upload path: ${mainUploadDir}
-🔍 Debug info: http://localhost:${PORT}/debug/uploads
-🎯 Test image: http://localhost:${PORT}/test-skill-image
+🔍 Debug: https://backend-portfolio-production-39a1.up.railway.app/debug/uploads
+🎯 Test: https://backend-portfolio-production-39a1.up.railway.app/test-skill-image
+📁 Files: https://backend-portfolio-production-39a1.up.railway.app/uploads/skills/
 
-📸 Upload routes available:
-   • POST /api/upload/cover
-   • POST /api/upload/pictures  
-   • POST /api/upload/skill-icon
-   • POST /api/upload/skills
-   • POST /api/upload/skill-icons
-   • POST /api/upload/cleanup
+🎯 Frontend URLs autorisées:
+   • http://localhost:5173 (dev)
+   • https://portfolio-frontend-olive-seven.vercel.app (prod)
   `);
 });
 
