@@ -7,6 +7,9 @@ const userController = {
   getUser: async (req, res) => {
     try {
       const user = await User.findOne(); // Un seul utilisateur
+
+      console.log('🔍 USER TROUVÉ:', user ? 'OUI' : 'NON');
+      console.log('🔍 USER DATA:', user);
       
       if (!user) {
         return res.status(404).json({
@@ -242,6 +245,8 @@ const userController = {
 
   updateAboutData: async (req, res) => {
     try {
+      console.log('🔍 REQ.BODY updateAboutData:', req.body);
+      
       const { currentJob, introductionParagraph, journeyParagraph, goalsParagraph, hobbies } = req.body;
 
       const user = await User.findOne();
