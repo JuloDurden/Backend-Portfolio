@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 // Import des middlewares
@@ -42,8 +44,34 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 Static files (uploads)
-app.use('/uploads', express.static('uploads'));
+// 📁 ROUTE DÉDIÉE POUR SERVIR LES FICHIERS UPLOADÉS
+app.get('/uploads/*', (req, res) => {
+  const filePath = path.join(__dirname, req.path);
+  console.log('🖼️ Tentative accès fichier:', filePath);
+  
+  // Vérifier si le fichier existe
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error('❌ Fichier non trouvé:', filePath);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Fichier non trouvé',
+        path: req.path 
+      });
+    }
+    
+    // Servir le fichier
+    res.sendFile(filePath, (sendErr) => {
+      if (sendErr) {
+        console.error('❌ Erreur envoi fichier:', sendErr);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Erreur lors de l\'envoi du fichier' 
+        });
+      }
+    });
+  });
+});
 
 // 🏠 Route de test
 app.get('/', (req, res) => {
@@ -95,7 +123,7 @@ app.post('/api/upload/skill-icons', upload.single('icon'), UploadController.uplo
 // Nettoyage
 app.post('/api/upload/cleanup', UploadController.cleanup);
 
-// 🚫 Route 404
+// 🚫 Route 404 (GARDER EN DERNIER!)
 app.all('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -107,15 +135,30 @@ app.all('*', (req, res) => {
 app.use(errorHandler);
 
 // 🌐 Démarrage du serveur
-const PORT = process.env.PORT || 5000; // 🔄 CHANGÉ POUR TON PORT
+const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
+  // Créer le dossier uploads s'il n'existe pas
+  const uploadsDir = path.join(__dirname, 'uploads');
+  const skillsDir = path.join(__dirname, 'uploads/skills');
+  
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('📁 Dossier uploads créé');
+  }
+  
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+    console.log('📁 Dossier skills créé');
+  }
+
   console.log(`
 🚀 Server running on port ${PORT}
 🌍 Environment: ${process.env.NODE_ENV}
 📱 API URL: http://localhost:${PORT}
 🎯 Frontend: ${process.env.FRONTEND_URL}
 📁 Uploads: http://localhost:${PORT}/uploads
+📂 Uploads directory: ${uploadsDir}
 
 📸 Upload routes available:
    • POST /api/upload/cover
