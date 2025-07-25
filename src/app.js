@@ -22,8 +22,15 @@ const Skill = require('./models/Skill');
 // 🛡️ Middlewares de sécurité (AVANT LES ROUTES!)
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
+  origin: [
+    'http://localhost:5173',  // npm run dev
+    'http://localhost:4173',  // npm run preview  
+    'http://localhost:3000',  // backup
+    process.env.FRONTEND_URL  // production
+  ].filter(Boolean), // Supprime les undefined
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // 📊 Logging
