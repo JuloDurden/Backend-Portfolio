@@ -44,53 +44,38 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 ROUTE DÉDIÉE POUR SERVIR LES FICHIERS UPLOADÉS
-app.get('/uploads/*', (req, res) => {
-  // ESSAYER PLUSIEURS CHEMINS POSSIBLES
-  const possiblePaths = [
-    path.join(__dirname, req.path),           // /app/src/uploads/...
-    path.join(__dirname, '..', req.path),     // /app/uploads/...
-    path.join(process.cwd(), req.path),       // /app/uploads/...
-    path.join('/app', req.path)               // /app/uploads/...
+// 🎯 ROUTE CORRIGÉE POUR SERVIR LES FICHIERS - Railway Style
+app.use('/uploads', express.static('/app/uploads', {
+  maxAge: '1d', // Cache 1 jour
+  etag: false,
+  lastModified: false,
+  dotfiles: 'deny',
+  index: false // Pas de listing des dossiers
+}));
+
+// 🔍 Route d'info pour debug (temporaire)
+app.get('/debug/uploads', (req, res) => {
+  const uploadPaths = [
+    '/app/uploads',
+    '/app/src/uploads',
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, '..', 'uploads')
   ];
   
-  console.log('🔍 Chemins testés:', possiblePaths);
-  
-  // Fonction pour tester chaque chemin
-  const tryNextPath = (index) => {
-    if (index >= possiblePaths.length) {
-      console.error('❌ AUCUN FICHIER TROUVÉ dans tous les chemins');
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Fichier non trouvé',
-        path: req.path,
-        tried: possiblePaths
-      });
-    }
-    
-    const currentPath = possiblePaths[index];
-    console.log(`🧪 Test chemin ${index + 1}:`, currentPath);
-    
-    fs.access(currentPath, fs.constants.F_OK, (err) => {
-      if (err) {
-        console.log(`❌ Pas trouvé: ${currentPath}`);
-        tryNextPath(index + 1); // Essayer le suivant
-      } else {
-        console.log(`✅ TROUVÉ: ${currentPath}`);
-        res.sendFile(currentPath, (sendErr) => {
-          if (sendErr) {
-            console.error('❌ Erreur envoi fichier:', sendErr);
-            res.status(500).json({ 
-              success: false, 
-              message: 'Erreur lors de l\'envoi du fichier' 
-            });
-          }
-        });
+  const info = uploadPaths.map(p => {
+    try {
+      const exists = fs.existsSync(p);
+      let files = [];
+      if (exists && fs.existsSync(path.join(p, 'skills'))) {
+        files = fs.readdirSync(path.join(p, 'skills'));
       }
-    });
-  };
+      return { path: p, exists, skillsFiles: files };
+    } catch (error) {
+      return { path: p, exists: false, error: error.message };
+    }
+  });
   
-  tryNextPath(0); // Commencer par le premier chemin
+  res.json({ uploadPaths: info, NODE_ENV: process.env.NODE_ENV });
 });
 
 // 🏠 Route de test
@@ -158,36 +143,50 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-  // ESSAYER DE CRÉER LE DOSSIER UPLOADS DANS TOUS LES ENDROITS POSSIBLES
-  const possibleUploadsDirs = [
-    path.join(__dirname, 'uploads'),
-    path.join(__dirname, '..', 'uploads'),
-    path.join(process.cwd(), 'uploads'),
-    path.join('/app', 'uploads')
-  ];
+  // 🎯 CRÉATION FORCÉE DU DOSSIER PRINCIPAL SUR RAILWAY
+  const mainUploadDir = '/app/uploads';
+  const skillsUploadDir = '/app/uploads/skills';
+  const projectsUploadDir = '/app/uploads/projects';
   
-  console.log('🔍 Tentative création dossiers uploads dans:');
-  possibleUploadsDirs.forEach((dir, index) => {
-    console.log(`${index + 1}. ${dir}`);
-    try {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`✅ Dossier créé: ${dir}`);
-      } else {
-        console.log(`📁 Dossier existe: ${dir}`);
-      }
-      
-      const skillsDir = path.join(dir, 'skills');
-      if (!fs.existsSync(skillsDir)) {
-        fs.mkdirSync(skillsDir, { recursive: true });
-        console.log(`✅ Dossier skills créé: ${skillsDir}`);
-      } else {
-        console.log(`📁 Dossier skills existe: ${skillsDir}`);
-      }
-    } catch (error) {
-      console.log(`❌ Erreur création ${dir}:`, error.message);
+  console.log('🚀 Initialisation des dossiers uploads sur Railway...');
+  
+  try {
+    // Créer le dossier principal
+    if (!fs.existsSync(mainUploadDir)) {
+      fs.mkdirSync(mainUploadDir, { recursive: true });
+      console.log(`✅ Dossier principal créé: ${mainUploadDir}`);
+    } else {
+      console.log(`📁 Dossier principal existe: ${mainUploadDir}`);
     }
-  });
+    
+    // Créer le sous-dossier skills
+    if (!fs.existsSync(skillsUploadDir)) {
+      fs.mkdirSync(skillsUploadDir, { recursive: true });
+      console.log(`✅ Dossier skills créé: ${skillsUploadDir}`);
+    } else {
+      console.log(`📁 Dossier skills existe: ${skillsUploadDir}`);
+    }
+    
+    // Créer le sous-dossier projects
+    if (!fs.existsSync(projectsUploadDir)) {
+      fs.mkdirSync(projectsUploadDir, { recursive: true });
+      console.log(`✅ Dossier projects créé: ${projectsUploadDir}`);
+    } else {
+      console.log(`📁 Dossier projects existe: ${projectsUploadDir}`);
+    }
+    
+    // Vérifier les fichiers existants
+    if (fs.existsSync(skillsUploadDir)) {
+      const skillFiles = fs.readdirSync(skillsUploadDir);
+      console.log(`📄 Fichiers skills trouvés: ${skillFiles.length}`);
+      if (skillFiles.length > 0) {
+        console.log(`📄 Premier fichier: ${skillFiles[0]}`);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur initialisation uploads:', error);
+  }
 
   console.log(`
 🚀 Server running on port ${PORT}
@@ -195,8 +194,8 @@ const server = app.listen(PORT, () => {
 📱 API URL: http://localhost:${PORT}
 🎯 Frontend: ${process.env.FRONTEND_URL}
 📁 Uploads: http://localhost:${PORT}/uploads
-📂 __dirname: ${__dirname}
-📂 process.cwd(): ${process.cwd()}
+📂 Upload path: ${mainUploadDir}
+🔍 Debug info: http://localhost:${PORT}/debug/uploads
 
 📸 Upload routes available:
    • POST /api/upload/cover
