@@ -9,6 +9,7 @@ router.get('/', userController.getUser);
 router.post('/', protect, userController.createUser);
 router.put('/', protect, userController.updateUser);
 router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
+router.post('/avatar', protect, uploadAvatar, userController.updateAvatar);
 
 // 🆕 Nouvelles routes spécifiques
 router.put('/personal', protect, userController.updatePersonalData);
