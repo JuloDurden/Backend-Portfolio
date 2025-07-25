@@ -25,7 +25,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',  // npm run dev
     'http://localhost:4173',  // npm run preview  
-    'http://localhost:3000',  // backup
+    process.env.FRONTEND_VERCEL_URL,
     process.env.FRONTEND_URL  // production
   ].filter(Boolean), // Supprime les undefined
   credentials: true,
