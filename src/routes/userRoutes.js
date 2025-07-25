@@ -10,7 +10,7 @@ router.post('/', protect, userController.createUser);
 router.put('/', protect, userController.updateUser);
 router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
 
-// 🆕 NOUVELLES ROUTES SPÉCIFIQUES
+// 🆕 Nouvelles routes spécifiques
 router.put('/personal', protect, userController.updatePersonalData);
 router.put('/about', protect, userController.updateAboutData);
 
