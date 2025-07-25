@@ -91,7 +91,7 @@ const getSkillsByCategory = async (req, res) => {
 const getSkillById = async (req, res) => {
   try {
     // 🔥 CORRIGÉ : utiliser le champ "id" au lieu de "_id"
-    const skill = await Skill.findOne({ id: req.params.id });
+    const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
       return res.status(404).json({
@@ -177,7 +177,7 @@ const updateSkill = async (req, res) => {
     console.log('🔍 REQ.FILE:', req.file);
     
     // 🔥 CORRIGÉ : utiliser le champ "id"
-    const skill = await Skill.findOne({ id: req.params.id });
+    const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
       return res.status(404).json({
@@ -206,8 +206,8 @@ const updateSkill = async (req, res) => {
     }
 
     // 🔥 CORRIGÉ : findOneAndUpdate + runValidators: false
-    const updatedSkill = await Skill.findOneAndUpdate(
-      { id: req.params.id },
+    const updatedSkill = await Skill.findByIdAndUpdate(
+      req.params.id,
       { $set: updateData },
       {
         new: true,
@@ -252,7 +252,7 @@ const deleteSkill = async (req, res) => {
     console.log('🔍 DELETE SKILL ID:', req.params.id);
     
     // 🔥 CORRIGÉ : utiliser le champ "id"
-    const skill = await Skill.findOne({ id: req.params.id });
+    const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
       return res.status(404).json({
