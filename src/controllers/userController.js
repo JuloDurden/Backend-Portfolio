@@ -243,12 +243,11 @@ const userController = {
     }
   },
 
+  // 🔥 FONCTION CORRIGÉE - MERGE DES DONNÉES
   updateAboutData: async (req, res) => {
     try {
       console.log('🔍 REQ.BODY updateAboutData:', req.body);
       
-      const { currentJob, introductionParagraph, journeyParagraph, goalsParagraph, hobbies } = req.body;
-
       const user = await User.findOne();
       
       if (!user) {
@@ -258,13 +257,25 @@ const userController = {
         });
       }
 
-      user.currentJob = currentJob;
-      user.introductionParagraph = introductionParagraph;
-      user.journeyParagraph = journeyParagraph;
-      user.goalsParagraph = goalsParagraph;
-      user.hobbies = hobbies;
+      // 🎯 MERGER AVEC LES DONNÉES EXISTANTES (ne perdre aucune donnée)
+      const updatedData = {
+        // Garder les valeurs actuelles
+        currentJob: user.currentJob || '',
+        introductionParagraph: user.introductionParagraph || '',
+        journeyParagraph: user.journeyParagraph || '',
+        goalsParagraph: user.goalsParagraph || '',
+        hobbies: user.hobbies || [],
+        // Écraser SEULEMENT avec les nouvelles valeurs fournies
+        ...req.body
+      };
 
+      console.log('🔍 Données après merge:', updatedData);
+
+      // 💾 APPLIQUER LES CHANGEMENTS
+      Object.assign(user, updatedData);
       await user.save();
+
+      console.log('✅ Utilisateur mis à jour avec succès');
 
       const userResponse = user.toObject();
       delete userResponse.password;
