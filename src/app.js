@@ -22,7 +22,10 @@ const Project = require('./models/Project');
 const Skill = require('./models/Skill');
 
 // 🛡️ Middlewares de sécurité (AVANT LES ROUTES!)
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // 🔧 Pour les images
+}));
+
 app.use(cors({
   origin: [
     'http://localhost:5173',  // npm run dev
@@ -35,9 +38,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 📊 Logging
+// 📊 Logging (plus discret en production)
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
 }
 
 // 📦 Parsing du body (AVANT LES ROUTES!)
@@ -50,7 +55,14 @@ app.use('/uploads', express.static('/app/uploads', {
   etag: false,
   lastModified: false,
   dotfiles: 'deny',
-  index: false // Pas de listing des dossiers
+  index: false, // Pas de listing des dossiers
+  setHeaders: (res, path) => {
+    // 🔧 Headers spécifiques pour les images
+    if (path.endsWith('.svg')) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+    }
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
 }));
 
 // 🔍 Route d'info pour debug (temporaire)
@@ -87,6 +99,29 @@ app.get('/', (req, res) => {
   });
 });
 
+// 🔧 Test direct d'un fichier skill (pour debug)
+app.get('/test-skill-image', (req, res) => {
+  const skillsDir = '/app/uploads/skills';
+  try {
+    if (fs.existsSync(skillsDir)) {
+      const files = fs.readdirSync(skillsDir);
+      if (files.length > 0) {
+        const firstFile = files[0];
+        return res.json({
+          success: true,
+          message: 'Fichier trouvé',
+          file: firstFile,
+          url: `/uploads/skills/${firstFile}`,
+          fullUrl: `${req.protocol}://${req.get('host')}/uploads/skills/${firstFile}`
+        });
+      }
+    }
+    res.json({ success: false, message: 'Aucun fichier skill trouvé' });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
 // ======= IMPORT DES ROUTES =======
 const skillRoutes = require('./routes/skillRoutes');
 const projectRoutes = require('./routes/projectRoutes');
@@ -104,6 +139,15 @@ const upload = multer({
   limits: { 
     fileSize: 10 * 1024 * 1024, // 10MB max
     files: 10 // Max 10 fichiers simultanés
+  },
+  fileFilter: (req, file, cb) => {
+    // 🔍 Log du fichier reçu
+    console.log('🔍 Fichier reçu:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    });
+    cb(null, true);
   }
 });
 
@@ -128,11 +172,11 @@ app.post('/api/upload/skill-icons', upload.single('icon'), UploadController.uplo
 // Nettoyage
 app.post('/api/upload/cleanup', UploadController.cleanup);
 
-// 🚫 Route 404 (GARDER EN DERNIER!)
-app.all('*', (req, res) => {
+// 🚫 Route 404 POUR LES API SEULEMENT (laisse /uploads tranquille)
+app.all('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`
+    message: `API Route ${req.originalUrl} not found`
   });
 });
 
@@ -196,6 +240,7 @@ const server = app.listen(PORT, () => {
 📁 Uploads: http://localhost:${PORT}/uploads
 📂 Upload path: ${mainUploadDir}
 🔍 Debug info: http://localhost:${PORT}/debug/uploads
+🎯 Test image: http://localhost:${PORT}/test-skill-image
 
 📸 Upload routes available:
    • POST /api/upload/cover
