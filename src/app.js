@@ -47,16 +47,19 @@ app.use(morgan('tiny')); // Plus simple que 'combined'
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 CORRECTION #1 : SERVIR LE BON DOSSIER !
-// Tes images sont dans /app/public/uploads, pas /app/uploads !
-app.use('/uploads', express.static('/app/public/uploads', {
-  maxAge: '7d', // Cache 7 jours
+// 🔥 CORRECTION FINALE : SERVIR DEPUIS LE BON PATH + FALLBACK
+const uploadsPath = process.env.NODE_ENV === 'production' 
+  ? '/app/public/uploads'  // Railway
+  : path.join(process.cwd(), 'public/uploads'); // Local
+
+app.use('/uploads', express.static(uploadsPath, {
+  maxAge: '7d',
   etag: true,
   lastModified: true,
   dotfiles: 'deny',
   index: false,
   setHeaders: (res, filePath) => {
-    // Headers optimisés pour images
+    // Headers optimisés pour tous types d'images
     if (filePath.endsWith('.webp')) {
       res.setHeader('Content-Type', 'image/webp');
     } else if (filePath.endsWith('.svg')) {
@@ -70,28 +73,31 @@ app.use('/uploads', express.static('/app/public/uploads', {
     // CORS pour toutes les images
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    
-    // Cache optimisé
-    res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 jours
+    res.setHeader('Cache-Control', 'public, max-age=604800');
   }
 }));
 
-// 🔍 CORRECTION #2 : DEBUG AVEC LES BONS CHEMINS
+// 🔍 DEBUG COMPLET AVEC DIAGNOSTIC SYSTÈME
 app.get('/debug/uploads', (req, res) => {
-  // 🔥 CHEMINS CORRIGÉS selon ton ImageProcessor.js !
-  const skillsDir = '/app/public/uploads/skills';
-  const coversSmallDir = '/app/public/uploads/projects/covers/400x400';
-  const coversLargeDir = '/app/public/uploads/projects/covers/1000x1000';
-  const picturesDir = '/app/public/uploads/projects/pictures';
+  const skillsDir = path.join(uploadsPath, 'skills');
+  const coversSmallDir = path.join(uploadsPath, 'projects/covers/400x400');
+  const coversLargeDir = path.join(uploadsPath, 'projects/covers/1000x1000');
+  const picturesDir = path.join(uploadsPath, 'projects/pictures');
   
   try {
     const result = {
       success: true,
+      system: {
+        cwd: process.cwd(),
+        nodeEnv: process.env.NODE_ENV,
+        uploadsPath: uploadsPath,
+        platform: process.platform
+      },
       paths: {},
       testUrls: []
     };
     
-    // Check chaque dossier
+    // Check chaque dossier avec diagnostic
     const dirs = [
       { name: 'skills', path: skillsDir },
       { name: 'covers_small', path: coversSmallDir },
@@ -101,23 +107,38 @@ app.get('/debug/uploads', (req, res) => {
     
     dirs.forEach(({ name, path: dirPath }) => {
       const exists = fs.existsSync(dirPath);
-      const files = exists ? fs.readdirSync(dirPath) : [];
+      let files = [];
+      let permissions = null;
+      
+      if (exists) {
+        try {
+          files = fs.readdirSync(dirPath);
+          const stats = fs.statSync(dirPath);
+          permissions = {
+            mode: stats.mode.toString(8),
+            isWritable: (stats.mode & parseInt('200', 8)) !== 0
+          };
+        } catch (e) {
+          permissions = { error: e.message };
+        }
+      }
       
       result.paths[name] = {
         path: dirPath,
         exists,
-        files: files.slice(0, 5), // 5 premiers
-        count: files.length
+        files: files.slice(0, 5),
+        count: files.length,
+        permissions
       };
       
       // URL de test pour le premier fichier
       if (files.length > 0) {
-        const urlPath = dirPath.replace('/app/public', '');
+        const urlPath = dirPath.replace(uploadsPath, '');
         result.testUrls.push({
           type: name,
           file: files[0],
-          url: `${urlPath}/${files[0]}`,
-          fullUrl: `${req.protocol}://${req.get('host')}${urlPath}/${files[0]}`
+          url: `/uploads${urlPath}/${files[0]}`,
+          fullUrl: `${req.protocol}://${req.get('host')}/uploads${urlPath}/${files[0]}`
         });
       }
     });
@@ -127,7 +148,43 @@ app.get('/debug/uploads', (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// 🧪 TEST UPLOAD IMMÉDIAT POUR DIAGNOSTIC
+app.post('/debug/test-upload', (req, res) => {
+  try {
+    const testContent = `Test upload ${Date.now()}`;
+    const testPath = path.join(uploadsPath, `test-${Date.now()}.txt`);
+    
+    fs.writeFileSync(testPath, testContent);
+    
+    // Vérifie immédiatement
+    const exists = fs.existsSync(testPath);
+    const canRead = exists ? fs.readFileSync(testPath, 'utf8') : null;
+    
+    // Nettoie
+    if (exists) {
+      try { fs.unlinkSync(testPath); } catch(e) {}
+    }
+    
+    res.json({
+      success: true,
+      message: 'Test d\'écriture réussi',
+      testPath,
+      exists,
+      contentMatch: canRead === testContent,
+      uploadsPath
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      uploadsPath
     });
   }
 });
@@ -136,18 +193,19 @@ app.get('/debug/uploads', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 Portfolio API is running!',
-    version: '2.0.0',
+    version: '2.1.0',
     documentation: '/api/docs',
-    debug: '/debug/uploads'
+    debug: '/debug/uploads',
+    testUpload: '/debug/test-upload'
   });
 });
 
-// 🔧 CORRECTION #3 : TEST AVEC COVERS (plus probable d'exister)
+// 🔧 TEST COVERS AMÉLIORÉ
 app.get('/test-cover-image', (req, res) => {
-  const coversDir = '/app/public/uploads/projects/covers/400x400';
+  const coversDir = path.join(uploadsPath, 'projects/covers/400x400');
   try {
     if (fs.existsSync(coversDir)) {
-      const files = fs.readdirSync(coversDir);
+      const files = fs.readdirSync(coversDir).filter(f => f.endsWith('.webp'));
       if (files.length > 0) {
         const firstFile = files[0];
         const fullUrl = `${req.protocol}://${req.get('host')}/uploads/projects/covers/400x400/${firstFile}`;
@@ -178,12 +236,12 @@ app.get('/test-cover-image', (req, res) => {
   }
 });
 
-// 🔧 Test skill aussi (gardé)
+// 🔧 Test skill amélioré
 app.get('/test-skill-image', (req, res) => {
-  const skillsDir = '/app/public/uploads/skills';
+  const skillsDir = path.join(uploadsPath, 'skills');
   try {
     if (fs.existsSync(skillsDir)) {
-      const files = fs.readdirSync(skillsDir);
+      const files = fs.readdirSync(skillsDir).filter(f => f.endsWith('.png') || f.endsWith('.svg'));
       if (files.length > 0) {
         const firstFile = files[0];
         const fullUrl = `${req.protocol}://${req.get('host')}/uploads/skills/${firstFile}`;
@@ -225,7 +283,7 @@ const authRoutes = require('./routes/authRoutes');
 const multer = require('multer');
 const UploadController = require('./controllers/uploadController');
 
-// ⚡ Configuration Multer OPTIMISÉE
+// ⚡ Configuration Multer ROBUSTE
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { 
@@ -233,11 +291,18 @@ const upload = multer({
     files: 10 // Max 10 fichiers simultanés
   },
   fileFilter: (req, file, cb) => {
-    // 🔍 Log réduit (évite le spam)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📁 Upload:', file.originalname, file.mimetype);
+    // Validation renforcée
+    const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      console.log(`📁 Upload accepté: ${file.originalname} (${file.mimetype})`);
+      return cb(null, true);
+    } else {
+      console.log(`❌ Upload rejeté: ${file.originalname} (${file.mimetype})`);
+      return cb(new Error('Type de fichier non autorisé'));
     }
-    cb(null, true);
   }
 });
 
@@ -249,13 +314,22 @@ app.use('/api/user', userRoutes);
 app.use('/api/experiences', experienceRoutes);
 app.use('/api/auth', authRoutes);
 
-// 📸 ROUTES UPLOAD DIRECTES - TOUTES LES VARIANTES
-// Pour projets
-app.post('/api/upload/cover', upload.single('cover'), UploadController.uploadCover);
-app.post('/api/upload/pictures', upload.array('pictures', 10), UploadController.uploadPictures);
+// 📸 ROUTES UPLOAD AVEC LOGGING RENFORCÉ
+app.post('/api/upload/cover', (req, res, next) => {
+  console.log('🎯 Tentative upload cover...');
+  next();
+}, upload.single('cover'), UploadController.uploadCover);
 
-// Pour skills - TOUTES LES VARIANTES POSSIBLES
-app.post('/api/upload/skill-icon', upload.single('icon'), UploadController.uploadSkillIcon);
+app.post('/api/upload/pictures', (req, res, next) => {
+  console.log('🎯 Tentative upload pictures...');
+  next();
+}, upload.array('pictures', 10), UploadController.uploadPictures);
+
+app.post('/api/upload/skill-icon', (req, res, next) => {
+  console.log('🎯 Tentative upload skill-icon...');
+  next();
+}, upload.single('icon'), UploadController.uploadSkillIcon);
+
 app.post('/api/upload/skills', upload.single('icon'), UploadController.uploadSkillIcon);
 app.post('/api/upload/skill-icons', upload.single('icon'), UploadController.uploadSkillIcon);
 
@@ -265,7 +339,7 @@ app.post('/api/upload/cleanup', UploadController.cleanup);
 // 🔥 Middleware de gestion d'erreurs (AVANT la route 404)
 app.use(errorHandler);
 
-// 🚫 Route 404 POUR LES API SEULEMENT - DÉPLACÉE APRÈS errorHandler
+// 🚫 Route 404 POUR LES API SEULEMENT
 app.all('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -275,6 +349,7 @@ app.all('/api/*', (req, res) => {
       '/api/projects', 
       '/api/upload/skill-icon',
       '/debug/uploads',
+      '/debug/test-upload',
       '/test-skill-image',
       '/test-cover-image'
     ]
@@ -285,47 +360,49 @@ app.all('/api/*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-  // 🎯 CORRECTION #4 : INITIALISATION AVEC LES BONS CHEMINS
-  const mainUploadDir = '/app/public/uploads';
-  const skillsUploadDir = '/app/public/uploads/skills';
+  // 🎯 INITIALISATION AVEC PATH DYNAMIC
+  const skillsUploadDir = path.join(uploadsPath, 'skills');
   const projectsUploadDirs = [
-    '/app/public/uploads/projects',
-    '/app/public/uploads/projects/covers',
-    '/app/public/uploads/projects/covers/400x400',
-    '/app/public/uploads/projects/covers/1000x1000',
-    '/app/public/uploads/projects/pictures'
+    path.join(uploadsPath, 'projects'),
+    path.join(uploadsPath, 'projects/covers'),
+    path.join(uploadsPath, 'projects/covers/400x400'),
+    path.join(uploadsPath, 'projects/covers/1000x1000'),
+    path.join(uploadsPath, 'projects/pictures')
   ];
   
   console.log('🚀 Initialisation des dossiers uploads...');
+  console.log(`📂 Base upload path: ${uploadsPath}`);
   
   try {
     // Créer tous les dossiers
-    const allDirs = [mainUploadDir, skillsUploadDir, ...projectsUploadDirs];
+    const allDirs = [uploadsPath, skillsUploadDir, ...projectsUploadDirs];
     allDirs.forEach(dir => {
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
         console.log(`✅ Dossier créé: ${dir}`);
       }
     });
     
-    // 🔧 COMPTAGE CORRIGÉ
-    const skillFiles = fs.existsSync(skillsUploadDir) 
-      ? fs.readdirSync(skillsUploadDir) 
-      : [];
+    // Test d'écriture immédiat
+    const testFile = path.join(uploadsPath, 'test-write.txt');
+    try {
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      console.log('✅ Écriture possible dans', uploadsPath);
+    } catch (e) {
+      console.error('❌ Impossible d\'écrire dans', uploadsPath, e.message);
+    }
     
-    const coverFiles = fs.existsSync('/app/public/uploads/projects/covers/400x400') 
-      ? fs.readdirSync('/app/public/uploads/projects/covers/400x400') 
-      : [];
+    // Comptage des fichiers
+    const skillFiles = fs.existsSync(skillsUploadDir) ? fs.readdirSync(skillsUploadDir) : [];
+    const coverFiles = fs.existsSync(path.join(uploadsPath, 'projects/covers/400x400')) 
+      ? fs.readdirSync(path.join(uploadsPath, 'projects/covers/400x400')) : [];
     
     console.log(`📄 Skills: ${skillFiles.length} fichiers`);
     console.log(`📄 Covers: ${coverFiles.length} fichiers`);
     
-    if (skillFiles.length > 0) {
-      console.log(`📄 Premier skill: ${skillFiles[0]}`);
-    }
-    if (coverFiles.length > 0) {
-      console.log(`📄 Première cover: ${coverFiles[0]}`);
-    }
+    if (skillFiles.length > 0) console.log(`📄 Premier skill: ${skillFiles[0]}`);
+    if (coverFiles.length > 0) console.log(`📄 Première cover: ${coverFiles[0]}`);
     
   } catch (error) {
     console.error('❌ Erreur initialisation uploads:', error);
@@ -334,15 +411,16 @@ const server = app.listen(PORT, () => {
   console.log(`
 🚀 Server running on port ${PORT}
 🌍 Environment: ${process.env.NODE_ENV}
-📂 Upload path: ${mainUploadDir}
+📂 Upload path: ${uploadsPath}
 🔍 Debug: https://backend-portfolio-production-39a1.up.railway.app/debug/uploads
+🧪 Test Upload: https://backend-portfolio-production-39a1.up.railway.app/debug/test-upload
 🎯 Test Skills: https://backend-portfolio-production-39a1.up.railway.app/test-skill-image
 🎯 Test Covers: https://backend-portfolio-production-39a1.up.railway.app/test-cover-image
 📁 Static Files: https://backend-portfolio-production-39a1.up.railway.app/uploads/
 
 🎯 Frontend URLs autorisées:
    • http://localhost:5173 (dev)
-   • https://portfolio-frontend-olive-seven.vercel.app (prod)
+   • https://portfolio-mu-liart-34.vercel.app (prod)
   `);
 });
 
