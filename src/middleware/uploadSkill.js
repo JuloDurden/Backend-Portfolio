@@ -1,29 +1,25 @@
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
-// Créer le dossier de destination s'il n'existe pas
-const uploadDir = 'uploads/skills';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Configuration du stockage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
+// Configuration du stockage Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'portfolio/skills',
+    allowed_formats: ['jpg', 'png', 'gif', 'svg', 'jpeg', 'webp'],
+    public_id: (req, file) => {
+      const uniqueSuffix = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      return `skill_${uniqueSuffix}`;
+    },
+    transformation: [
+      { width: 500, height: 500, crop: 'limit', quality: 'auto' }
+    ]
   },
-  filename: function (req, file, cb) {
-    // Format: skill_timestamp_random.ext
-    const uniqueSuffix = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    const filename = 'skill_' + uniqueSuffix + path.extname(file.originalname);
-    cb(null, filename);
-  }
 });
 
-// Filtre des fichiers
+// Filtre des fichiers (même logique qu'avant)
 const fileFilter = (req, file, cb) => {
-  // Types MIME autorisés pour les icônes
   const allowedMimes = [
     'image/jpeg',
     'image/jpg', 
@@ -39,11 +35,11 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configuration multer
+// Configuration multer avec Cloudinary
 const uploadSkill = multer({
   storage: storage,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB max pour les icônes
+    fileSize: 2 * 1024 * 1024, // 2MB max
   },
   fileFilter: fileFilter
 });

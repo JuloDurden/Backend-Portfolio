@@ -19,6 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^4.21.2",
@@ -29,6 +30,7 @@
     "mongoose": "^8.8.4",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
     "sharp": "^0.34.3",
     "uuid": "^11.1.0",
     "validator": "^13.12.0"

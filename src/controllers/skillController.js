@@ -90,7 +90,6 @@ const getSkillsByCategory = async (req, res) => {
  */
 const getSkillById = async (req, res) => {
   try {
-    // 🔥 CORRIGÉ : utiliser le champ "id" au lieu de "_id"
     const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
@@ -131,9 +130,9 @@ const createSkill = async (req, res) => {
       id: skillId
     };
 
-    // Si fichier uploadé, utiliser le chemin local
+    // Si fichier uploadé, utiliser l'URL Cloudinary
     if (req.file) {
-      skillData.icon = req.file.path.replace(/\\/g, '/');
+      skillData.icon = req.file.path; // Cloudinary donne directement l'URL dans .path
     }
     
     const skill = await Skill.create(skillData);
@@ -176,7 +175,6 @@ const updateSkill = async (req, res) => {
     console.log('🔍 REQ.BODY updateSkill:', req.body);
     console.log('🔍 REQ.FILE:', req.file);
     
-    // 🔥 CORRIGÉ : utiliser le champ "id"
     const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
@@ -191,27 +189,31 @@ const updateSkill = async (req, res) => {
 
     // Si un nouveau fichier est uploadé
     if (req.file) {
-      // Supprimer l'ancienne icône si c'était un fichier local
-      if (skill.icon && skill.icon.startsWith('uploads/skills/')) {
-        const fs = require('fs');
-        const oldIconPath = skill.icon;
-        if (fs.existsSync(oldIconPath)) {
-          fs.unlinkSync(oldIconPath);
-          console.log(`Ancienne icône supprimée : ${oldIconPath}`);
+      // Supprimer l'ancienne icône de Cloudinary si nécessaire
+      if (skill.icon && skill.icon.includes('cloudinary.com')) {
+        try {
+          // Extraire le public_id depuis l'URL Cloudinary
+          const urlParts = skill.icon.split('/');
+          const publicIdWithExt = urlParts[urlParts.length - 1];
+          const publicId = `portfolio/skills/${publicIdWithExt.split('.')[0]}`;
+          
+          await require('../config/cloudinary').cloudinary.uploader.destroy(publicId);
+          console.log(`Ancienne icône Cloudinary supprimée : ${publicId}`);
+        } catch (err) {
+          console.log('Erreur suppression Cloudinary:', err.message);
         }
       }
       
-      // Utiliser la nouvelle icône
-      updateData.icon = req.file.path.replace(/\\/g, '/');
+      // Utiliser la nouvelle icône Cloudinary
+      updateData.icon = req.file.path;
     }
 
-    // 🔥 CORRIGÉ : findOneAndUpdate + runValidators: false
     const updatedSkill = await Skill.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
       {
         new: true,
-        runValidators: false // 🔥 Évite les erreurs de validation comme avant
+        runValidators: false
       }
     );
     
@@ -251,7 +253,6 @@ const deleteSkill = async (req, res) => {
   try {
     console.log('🔍 DELETE SKILL ID:', req.params.id);
     
-    // 🔥 CORRIGÉ : utiliser le champ "id"
     const skill = await Skill.findById(req.params.id);
     
     if (!skill) {
@@ -261,16 +262,21 @@ const deleteSkill = async (req, res) => {
       });
     }
 
-    // Supprimer le fichier icône si c'était un upload local
-    if (skill.icon && skill.icon.startsWith('uploads/skills/')) {
-      const fs = require('fs');
-      if (fs.existsSync(skill.icon)) {
-        fs.unlinkSync(skill.icon);
-        console.log(`Icône supprimée : ${skill.icon}`);
+    // Supprimer le fichier icône de Cloudinary
+    if (skill.icon && skill.icon.includes('cloudinary.com')) {
+      try {
+        // Extraire le public_id depuis l'URL Cloudinary
+        const urlParts = skill.icon.split('/');
+        const publicIdWithExt = urlParts[urlParts.length - 1];
+        const publicId = `portfolio/skills/${publicIdWithExt.split('.')[0]}`;
+        
+        await require('../config/cloudinary').cloudinary.uploader.destroy(publicId);
+        console.log(`Icône Cloudinary supprimée : ${publicId}`);
+      } catch (err) {
+        console.log('Erreur suppression Cloudinary:', err.message);
       }
     }
     
-    // 🔥 CORRIGÉ : findOneAndDelete
     await Skill.findByIdAndDelete(req.params.id);
     
     console.log(`✅ Skill supprimée: ${skill.name}`);
