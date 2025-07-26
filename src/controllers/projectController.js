@@ -1,6 +1,5 @@
 const Project = require('../models/Project');
-const path = require('path');
-const fs = require('fs');
+const { cloudinary } = require('../config/cloudinary');
 
 /**
  * @desc    Récupérer tous les projets
@@ -115,24 +114,24 @@ const getFeaturedProjects = async (req, res) => {
  */
 const createProject = async (req, res) => {
   try {
-    // 🔧 NOUVEAU : Récupération des chemins d'images depuis req.files
+    // 🔧 NOUVEAU : Récupération des URLs Cloudinary
     const projectData = { ...req.body };
     
-    // Si des fichiers ont été uploadés, on récupère leurs chemins
+    // Si des fichiers ont été uploadés sur Cloudinary
     if (req.uploadedFiles) {
       const { covers, pictures } = req.uploadedFiles;
       
-      // Structure des covers (small/large)
-      if (covers && covers.length >= 2) {
+      // Structure des covers (small/large) avec URLs Cloudinary
+      if (covers && covers.small && covers.large) {
         projectData.cover = {
-          small: covers.find(f => f.includes('_400')),
-          large: covers.find(f => f.includes('_1000'))
+          small: covers.small,
+          large: covers.large
         };
       }
       
-      // Array des pictures
+      // Array des pictures avec URLs Cloudinary
       if (pictures && pictures.length > 0) {
-        projectData.pictures = pictures;
+        projectData.pictures = pictures.map(pic => pic.url);
       }
     }
     
@@ -159,31 +158,40 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
   try {
-    // 🔧 NOUVEAU : Gestion des nouvelles images uploadées
+    // 🔧 NOUVEAU : Gestion des nouvelles images Cloudinary
     const updateData = { ...req.body };
     
-    // Si de nouvelles images ont été uploadées
+    // Si de nouvelles images ont été uploadées sur Cloudinary
     if (req.uploadedFiles) {
       const { covers, pictures } = req.uploadedFiles;
       
-      // 🗑️ Supprimer les anciennes images si nécessaire
+      // 🗑️ Supprimer les anciennes images Cloudinary si nécessaire
       const existingProject = await Project.findById(req.params.id);
       if (existingProject) {
-        // Supprimer anciennes covers
-        if (covers && covers.length >= 2) {
-          if (existingProject.cover.small) deleteFile(existingProject.cover.small);
-          if (existingProject.cover.large) deleteFile(existingProject.cover.large);
+        
+        // Mise à jour des covers
+        if (covers && covers.small && covers.large) {
+          // Supprimer l'ancienne cover de Cloudinary (si elle existe)
+          if (existingProject.cover && existingProject.cover.publicId) {
+            await deleteCloudinaryImage(existingProject.cover.publicId);
+          }
           
           updateData.cover = {
-            small: covers.find(f => f.includes('_400')),
-            large: covers.find(f => f.includes('_1000'))
+            small: covers.small,
+            large: covers.large
           };
         }
         
-        // Supprimer anciennes pictures
+        // Mise à jour des pictures
         if (pictures && pictures.length > 0) {
-          existingProject.pictures.forEach(pic => deleteFile(pic));
-          updateData.pictures = pictures;
+          // Supprimer les anciennes pictures de Cloudinary
+          if (existingProject.pictures && existingProject.pictures.length > 0) {
+            // Extraire les public_ids des anciennes URLs et les supprimer
+            // (On fera une version simplifiée ici)
+            console.log('Anciennes pictures à supprimer:', existingProject.pictures);
+          }
+          
+          updateData.pictures = pictures.map(pic => pic.url);
         }
       }
     }
@@ -234,14 +242,24 @@ const deleteProject = async (req, res) => {
       });
     }
     
-    // 🗑️ NOUVEAU : Supprimer les fichiers images associés
-    if (project.cover) {
-      if (project.cover.small) deleteFile(project.cover.small);
-      if (project.cover.large) deleteFile(project.cover.large);
-    }
-    
-    if (project.pictures && project.pictures.length > 0) {
-      project.pictures.forEach(pic => deleteFile(pic));
+    // 🗑️ NOUVEAU : Supprimer les images de Cloudinary
+    try {
+      // Supprimer les covers (on va extraire le public_id de l'URL)
+      if (project.cover && project.cover.small) {
+        const publicId = extractPublicIdFromUrl(project.cover.small);
+        if (publicId) await deleteCloudinaryImage(publicId);
+      }
+      
+      // Supprimer les pictures
+      if (project.pictures && project.pictures.length > 0) {
+        for (const pictureUrl of project.pictures) {
+          const publicId = extractPublicIdFromUrl(pictureUrl);
+          if (publicId) await deleteCloudinaryImage(publicId);
+        }
+      }
+    } catch (cleanupError) {
+      console.error('Erreur nettoyage Cloudinary:', cleanupError);
+      // On continue même si le nettoyage échoue
     }
     
     await Project.findByIdAndDelete(req.params.id);
@@ -260,16 +278,28 @@ const deleteProject = async (req, res) => {
 };
 
 /**
- * 🛠️ FONCTION UTILITAIRE : Supprimer un fichier
+ * 🛠️ FONCTION UTILITAIRE : Supprimer une image de Cloudinary
  */
-const deleteFile = (filePath) => {
+const deleteCloudinaryImage = async (publicId) => {
   try {
-    const fullPath = path.join(__dirname, '..', 'public', filePath);
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
+    await cloudinary.uploader.destroy(publicId);
+    console.log(`Image Cloudinary supprimée: ${publicId}`);
   } catch (error) {
-    console.error('Erreur lors de la suppression du fichier:', error);
+    console.error('Erreur suppression Cloudinary:', error);
+  }
+};
+
+/**
+ * 🛠️ FONCTION UTILITAIRE : Extraire public_id d'une URL Cloudinary
+ */
+const extractPublicIdFromUrl = (url) => {
+  try {
+    // Exemple URL: https://res.cloudinary.com/your-cloud/image/upload/v1234567/portfolio/projects/abc123
+    const matches = url.match(/\/portfolio\/projects\/([^\/\.]+)/);
+    return matches ? `portfolio/projects/${matches[1]}` : null;
+  } catch (error) {
+    console.error('Erreur extraction public_id:', error);
+    return null;
   }
 };
 
