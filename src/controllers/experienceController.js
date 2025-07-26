@@ -1,20 +1,5 @@
 const Experience = require('../models/Experience');
-const fs = require('fs');
-const path = require('path');
-
-// Fonction locale pour supprimer une image
-const deleteImage = (imagePath) => {
-  try {
-    if (!imagePath) return;
-    const fullPath = path.join(__dirname, '../../uploads', imagePath);
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-      console.log(`✅ Image supprimée: ${imagePath}`);
-    }
-  } catch (error) {
-    console.error(`❌ Erreur suppression image:`, error);
-  }
-};
+const { deleteExperienceImage } = require('../middleware/uploadExperience');
 
 const experienceController = {
   // GET /api/experiences - Récupérer toutes les expériences (PUBLIC)
@@ -120,7 +105,7 @@ const experienceController = {
         endDate: endDate ? new Date(endDate) : null,
         description: Array.isArray(description) ? description : [description],
         technologies: Array.isArray(technologies) ? technologies : (technologies ? [technologies] : []),
-        image
+        image // URL Cloudinary complète
       });
 
       await experience.save();
@@ -132,6 +117,12 @@ const experienceController = {
       });
     } catch (error) {
       console.error('Erreur lors de la création de l\'expérience:', error);
+      
+      // Si erreur, supprimer l'image uploadée sur Cloudinary
+      if (req.uploadedFiles?.image) {
+        await deleteExperienceImage(req.uploadedFiles.image);
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Erreur serveur'
@@ -156,12 +147,12 @@ const experienceController = {
         });
       }
 
+      // Sauvegarder l'ancienne image pour suppression si remplacement
+      const oldImage = experience.image;
+
       // Gestion de l'image
       if (req.uploadedFiles?.image) {
-        if (experience.image) {
-          deleteImage(experience.image);
-        }
-        experience.image = req.uploadedFiles.image;
+        experience.image = req.uploadedFiles.image; // Nouvelle URL Cloudinary
       }
 
       // ✅ MISE À JOUR SÉLECTIVE (seulement les champs fournis)
@@ -210,6 +201,11 @@ const experienceController = {
 
       await experience.save();
 
+      // Supprimer l'ancienne image après succès de la sauvegarde
+      if (req.uploadedFiles?.image && oldImage && oldImage !== experience.image) {
+        await deleteExperienceImage(oldImage);
+      }
+
       res.json({
         success: true,
         data: experience,
@@ -218,6 +214,12 @@ const experienceController = {
       
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'expérience:', error);
+      
+      // Si erreur et nouvelle image uploadée, la supprimer
+      if (req.uploadedFiles?.image) {
+        await deleteExperienceImage(req.uploadedFiles.image);
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Erreur serveur'
@@ -237,9 +239,9 @@ const experienceController = {
         });
       }
 
-      // Supprimer l'image avant de supprimer l'expérience
+      // Supprimer l'image de Cloudinary avant de supprimer l'expérience
       if (experience.image) {
-        deleteImage(experience.image);
+        await deleteExperienceImage(experience.image);
       }
 
       await Experience.findByIdAndDelete(req.params.id);
