@@ -7,7 +7,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'portfolio/experiences',
-    format: async (req, file) => 'webp',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'], // ✅ CHANGÉ
     public_id: (req, file) => `experience_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     transformation: [
       { width: 400, height: 400, crop: 'fill', quality: 'auto:good' }
@@ -36,7 +36,7 @@ const upload = multer({
 });
 
 // Middleware de traitement des images Cloudinary
-const processExperienceImage = async (req, res, next) => {
+const processExperienceImage = (req, res, next) => { // ✅ RETIRÉ async
   if (!req.file) {
     return next();
   }
@@ -49,6 +49,7 @@ const processExperienceImage = async (req, res, next) => {
     };
     
     console.log('✅ Image Experience uploadée sur Cloudinary:', req.uploadedFiles.image);
+    console.log('✅ Public ID:', req.uploadedFiles.publicId);
     
     next();
   } catch (error) {
@@ -71,9 +72,11 @@ const deleteExperienceImage = async (imageUrl) => {
     if (publicId) {
       const result = await cloudinary.uploader.destroy(publicId);
       console.log(`✅ Image Cloudinary supprimée:`, result);
+      return result;
     }
   } catch (error) {
     console.error('❌ Erreur suppression image Cloudinary:', error);
+    throw error; // ✅ AJOUTÉ pour propager l'erreur
   }
 };
 
@@ -82,7 +85,8 @@ const extractPublicId = (url) => {
   try {
     if (!url || typeof url !== 'string') return null;
     
-    // Pattern pour extraire le public_id d'une URL Cloudinary
+    // Pattern amélioré pour extraire le public_id d'une URL Cloudinary
+    // Format typique: https://res.cloudinary.com/cloud/image/upload/v123456/portfolio/experiences/experience_123.webp
     const match = url.match(/\/portfolio\/experiences\/([^/.]+)/);
     return match ? `portfolio/experiences/${match[1]}` : null;
   } catch (error) {
