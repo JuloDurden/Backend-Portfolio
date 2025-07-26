@@ -19,6 +19,19 @@ const skillStorage = new CloudinaryStorage({
   },
 });
 
+// Storage pour les experiences 🆕
+const experienceStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'portfolio/experiences',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+    transformation: [
+      { width: 400, height: 400, crop: 'fill', quality: 'auto:good' }
+    ],
+    public_id: (req, file) => `experience_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  },
+});
+
 // Storage pour les projects covers
 const projectCoverStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -47,12 +60,14 @@ const projectPictureStorage = new CloudinaryStorage({
 
 // Multer configs
 const uploadSkill = multer({ storage: skillStorage });
+const uploadExperience = multer({ storage: experienceStorage }); // 🆕
 const uploadProjectCover = multer({ storage: projectCoverStorage });  
 const uploadProjectPictures = multer({ storage: projectPictureStorage });
 
 module.exports = {
   cloudinary,
   uploadSkill,
+  uploadExperience, // 🆕
   uploadProjectCover,
   uploadProjectPictures
 };
