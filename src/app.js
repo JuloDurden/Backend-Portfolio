@@ -31,7 +31,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',  // npm run dev
     'http://localhost:4173',  // npm run preview  
-    'https://portfolio-frontend-olive-seven.vercel.app', // 🔧 URL Vercel directe
+    'https://portfolio-mu-liart-34.vercel.app', // 🔧 URL Vercel directe
     process.env.FRONTEND_VERCEL_URL,
     process.env.FRONTEND_URL  // production
   ].filter(Boolean), // Supprime les undefined
@@ -47,16 +47,19 @@ app.use(morgan('tiny')); // Plus simple que 'combined'
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🎯 ROUTE OPTIMISÉE POUR SERVIR LES FICHIERS - Railway Style
-app.use('/uploads', express.static('/app/uploads', {
-  maxAge: '7d', // Cache 7 jours (plus long)
-  etag: true, // 🔧 Réactive etag pour le cache
+// 🔥 CORRECTION #1 : SERVIR LE BON DOSSIER !
+// Tes images sont dans /app/public/uploads, pas /app/uploads !
+app.use('/uploads', express.static('/app/public/uploads', {
+  maxAge: '7d', // Cache 7 jours
+  etag: true,
   lastModified: true,
   dotfiles: 'deny',
   index: false,
   setHeaders: (res, filePath) => {
-    // 🔧 Headers optimisés pour images
-    if (filePath.endsWith('.svg')) {
+    // Headers optimisés pour images
+    if (filePath.endsWith('.webp')) {
+      res.setHeader('Content-Type', 'image/webp');
+    } else if (filePath.endsWith('.svg')) {
       res.setHeader('Content-Type', 'image/svg+xml');
     } else if (filePath.endsWith('.png')) {
       res.setHeader('Content-Type', 'image/png');
@@ -68,47 +71,59 @@ app.use('/uploads', express.static('/app/uploads', {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     
-    // 🚀 Cache optimisé
+    // Cache optimisé
     res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 jours
   }
 }));
 
-// 🔍 Route d'info pour debug (temporaire)
+// 🔍 CORRECTION #2 : DEBUG AVEC LES BONS CHEMINS
 app.get('/debug/uploads', (req, res) => {
-  const skillsDir = '/app/uploads/skills';
-  const projectsDir = '/app/uploads/projects';
+  // 🔥 CHEMINS CORRIGÉS selon ton ImageProcessor.js !
+  const skillsDir = '/app/public/uploads/skills';
+  const coversSmallDir = '/app/public/uploads/projects/covers/400x400';
+  const coversLargeDir = '/app/public/uploads/projects/covers/1000x1000';
+  const picturesDir = '/app/public/uploads/projects/pictures';
   
   try {
-    const skillsExists = fs.existsSync(skillsDir);
-    const projectsExists = fs.existsSync(projectsDir);
-    
-    const skillFiles = skillsExists ? fs.readdirSync(skillsDir) : [];
-    const projectFiles = projectsExists ? fs.readdirSync(projectsDir) : [];
-    
-    res.json({
+    const result = {
       success: true,
-      paths: {
-        skills: {
-          path: skillsDir,
-          exists: skillsExists,
-          files: skillFiles,
-          count: skillFiles.length
-        },
-        projects: {
-          path: projectsDir,
-          exists: projectsExists,
-          files: projectFiles,
-          count: projectFiles.length
-        }
-      },
-      NODE_ENV: process.env.NODE_ENV,
-      // 🔧 URLs de test
-      testUrls: skillFiles.slice(0, 2).map(file => ({
-        file,
-        url: `/uploads/skills/${file}`,
-        fullUrl: `${req.protocol}://${req.get('host')}/uploads/skills/${file}`
-      }))
+      paths: {},
+      testUrls: []
+    };
+    
+    // Check chaque dossier
+    const dirs = [
+      { name: 'skills', path: skillsDir },
+      { name: 'covers_small', path: coversSmallDir },
+      { name: 'covers_large', path: coversLargeDir },
+      { name: 'pictures', path: picturesDir }
+    ];
+    
+    dirs.forEach(({ name, path: dirPath }) => {
+      const exists = fs.existsSync(dirPath);
+      const files = exists ? fs.readdirSync(dirPath) : [];
+      
+      result.paths[name] = {
+        path: dirPath,
+        exists,
+        files: files.slice(0, 5), // 5 premiers
+        count: files.length
+      };
+      
+      // URL de test pour le premier fichier
+      if (files.length > 0) {
+        const urlPath = dirPath.replace('/app/public', '');
+        result.testUrls.push({
+          type: name,
+          file: files[0],
+          url: `${urlPath}/${files[0]}`,
+          fullUrl: `${req.protocol}://${req.get('host')}${urlPath}/${files[0]}`
+        });
+      }
     });
+    
+    res.json(result);
+    
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -127,9 +142,45 @@ app.get('/', (req, res) => {
   });
 });
 
-// 🔧 Test direct d'un fichier skill (ROUTE CORRIGÉE)
+// 🔧 CORRECTION #3 : TEST AVEC COVERS (plus probable d'exister)
+app.get('/test-cover-image', (req, res) => {
+  const coversDir = '/app/public/uploads/projects/covers/400x400';
+  try {
+    if (fs.existsSync(coversDir)) {
+      const files = fs.readdirSync(coversDir);
+      if (files.length > 0) {
+        const firstFile = files[0];
+        const fullUrl = `${req.protocol}://${req.get('host')}/uploads/projects/covers/400x400/${firstFile}`;
+        
+        return res.json({
+          success: true,
+          message: 'Cover trouvée ✅',
+          file: firstFile,
+          relativeUrl: `/uploads/projects/covers/400x400/${firstFile}`,
+          fullUrl: fullUrl,
+          totalFiles: files.length,
+          allFiles: files.slice(0, 5)
+        });
+      }
+    }
+    res.status(404).json({ 
+      success: false, 
+      message: 'Aucune cover trouvée',
+      directory: coversDir,
+      exists: fs.existsSync(coversDir)
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      directory: coversDir
+    });
+  }
+});
+
+// 🔧 Test skill aussi (gardé)
 app.get('/test-skill-image', (req, res) => {
-  const skillsDir = '/app/uploads/skills';
+  const skillsDir = '/app/public/uploads/skills';
   try {
     if (fs.existsSync(skillsDir)) {
       const files = fs.readdirSync(skillsDir);
@@ -139,12 +190,12 @@ app.get('/test-skill-image', (req, res) => {
         
         return res.json({
           success: true,
-          message: 'Fichier trouvé ✅',
+          message: 'Fichier skill trouvé ✅',
           file: firstFile,
           relativeUrl: `/uploads/skills/${firstFile}`,
           fullUrl: fullUrl,
           totalFiles: files.length,
-          allFiles: files.slice(0, 5) // 5 premiers fichiers
+          allFiles: files.slice(0, 5)
         });
       }
     }
@@ -224,7 +275,8 @@ app.all('/api/*', (req, res) => {
       '/api/projects', 
       '/api/upload/skill-icon',
       '/debug/uploads',
-      '/test-skill-image'
+      '/test-skill-image',
+      '/test-cover-image'
     ]
   });
 });
@@ -233,16 +285,23 @@ app.all('/api/*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-  // 🎯 INITIALISATION OPTIMISÉE DES DOSSIERS
-  const mainUploadDir = '/app/uploads';
-  const skillsUploadDir = '/app/uploads/skills';
-  const projectsUploadDir = '/app/uploads/projects';
+  // 🎯 CORRECTION #4 : INITIALISATION AVEC LES BONS CHEMINS
+  const mainUploadDir = '/app/public/uploads';
+  const skillsUploadDir = '/app/public/uploads/skills';
+  const projectsUploadDirs = [
+    '/app/public/uploads/projects',
+    '/app/public/uploads/projects/covers',
+    '/app/public/uploads/projects/covers/400x400',
+    '/app/public/uploads/projects/covers/1000x1000',
+    '/app/public/uploads/projects/pictures'
+  ];
   
   console.log('🚀 Initialisation des dossiers uploads...');
   
   try {
     // Créer tous les dossiers
-    [mainUploadDir, skillsUploadDir, projectsUploadDir].forEach(dir => {
+    const allDirs = [mainUploadDir, skillsUploadDir, ...projectsUploadDirs];
+    allDirs.forEach(dir => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
         console.log(`✅ Dossier créé: ${dir}`);
@@ -254,15 +313,18 @@ const server = app.listen(PORT, () => {
       ? fs.readdirSync(skillsUploadDir) 
       : [];
     
-    const projectFiles = fs.existsSync(projectsUploadDir) 
-      ? fs.readdirSync(projectsUploadDir) 
+    const coverFiles = fs.existsSync('/app/public/uploads/projects/covers/400x400') 
+      ? fs.readdirSync('/app/public/uploads/projects/covers/400x400') 
       : [];
     
     console.log(`📄 Skills: ${skillFiles.length} fichiers`);
-    console.log(`📄 Projects: ${projectFiles.length} fichiers`);
+    console.log(`📄 Covers: ${coverFiles.length} fichiers`);
     
     if (skillFiles.length > 0) {
       console.log(`📄 Premier skill: ${skillFiles[0]}`);
+    }
+    if (coverFiles.length > 0) {
+      console.log(`📄 Première cover: ${coverFiles[0]}`);
     }
     
   } catch (error) {
@@ -274,8 +336,9 @@ const server = app.listen(PORT, () => {
 🌍 Environment: ${process.env.NODE_ENV}
 📂 Upload path: ${mainUploadDir}
 🔍 Debug: https://backend-portfolio-production-39a1.up.railway.app/debug/uploads
-🎯 Test: https://backend-portfolio-production-39a1.up.railway.app/test-skill-image
-📁 Files: https://backend-portfolio-production-39a1.up.railway.app/uploads/skills/
+🎯 Test Skills: https://backend-portfolio-production-39a1.up.railway.app/test-skill-image
+🎯 Test Covers: https://backend-portfolio-production-39a1.up.railway.app/test-cover-image
+📁 Static Files: https://backend-portfolio-production-39a1.up.railway.app/uploads/
 
 🎯 Frontend URLs autorisées:
    • http://localhost:5173 (dev)
