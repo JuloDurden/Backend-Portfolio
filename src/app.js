@@ -77,6 +77,18 @@ app.use('/uploads', express.static(uploadsPath, {
   }
 }));
 
+// Test Cloudinary config
+app.get('/debug/cloudinary-config', (req, res) => {
+  const { cloudinary } = require('./config/cloudinary');
+  
+  res.json({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? '✅ SET' : '❌ MISSING',
+    api_key: process.env.CLOUDINARY_API_KEY ? '✅ SET' : '❌ MISSING', 
+    api_secret: process.env.CLOUDINARY_API_SECRET ? '✅ SET' : '❌ MISSING',
+    config: cloudinary.config()
+  });
+});
+
 // 🔍 DEBUG COMPLET AVEC DIAGNOSTIC SYSTÈME
 app.get('/debug/uploads', (req, res) => {
   const skillsDir = path.join(uploadsPath, 'skills');
@@ -200,7 +212,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// 🔧 TEST COVERS AMÉLIORÉ
+// 🔧 TEST COVERS
 app.get('/test-cover-image', (req, res) => {
   const coversDir = path.join(uploadsPath, 'projects/covers/400x400');
   try {
@@ -236,7 +248,7 @@ app.get('/test-cover-image', (req, res) => {
   }
 });
 
-// 🔧 Test skill amélioré
+// 🔧 Test skill
 app.get('/test-skill-image', (req, res) => {
   const skillsDir = path.join(uploadsPath, 'skills');
   try {

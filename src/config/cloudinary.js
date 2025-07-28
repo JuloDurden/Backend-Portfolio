@@ -14,12 +14,66 @@ const skillStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'portfolio/skills',
-    allowed_formats: ['jpg', 'png', 'gif', 'svg', 'jpeg', 'webp'],
-    resource_type: 'auto', // ✅ CRUCIAL pour les SVG
-    public_id: (req, file) => `skill_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    // ✅ SUPPRESSION des transformations qui cassent les SVG
-  },
+    allowed_formats: ['svg', 'png', 'jpg', 'jpeg'],
+    resource_type: 'auto',
+    transformation: [
+      { width: 100, height: 100, crop: 'fit', format: 'auto' }
+    ]
+  }
 });
+
+// 🔧 AJOUT DU FILTRE AVEC LOGS
+const skillFileFilter = (req, file, cb) => {
+  console.log('🔍 SKILL FILE FILTER:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  });
+  
+  const allowedTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/jpg'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    console.log('✅ Fichier accepté');
+    cb(null, true);
+  } else {
+    console.log('❌ Fichier rejeté - type non supporté');
+    cb(new Error('Type de fichier non supporté. Utilisez SVG, PNG ou JPG.'), false);
+  }
+};
+
+const uploadSkill = multer({ 
+  storage: skillStorage,
+  fileFilter: skillFileFilter,
+  limits: { 
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+}).single('icon');
+
+// 🔧 MIDDLEWARE WRAPPER AVEC LOGS
+const uploadSkillWithLogs = (req, res, next) => {
+  console.log('🚀 UPLOAD SKILL START');
+  console.log('📝 Content-Type:', req.headers['content-type']);
+  
+  uploadSkill(req, res, (err) => {
+    if (err) {
+      console.error('❌ UPLOAD ERROR:', err.message);
+      return res.status(400).json({
+        success: false,
+        message: `Erreur upload: ${err.message}`
+      });
+    }
+    
+    console.log('✅ UPLOAD SUCCESS:', req.file ? 'File uploaded' : 'No file');
+    if (req.file) {
+      console.log('📎 File details:', {
+        filename: req.file.filename,
+        path: req.file.path,
+        size: req.file.size
+      });
+    }
+    next();
+  });
+};
 
 // Filtre des fichiers pour les skills
 const skillFileFilter = (req, file, cb) => {
@@ -97,7 +151,7 @@ const uploadProjectPictures = multer({ storage: projectPictureStorage });
 
 module.exports = {
   cloudinary,
-  uploadSkill,
+  uploadSkill: uploadSkillWithLogs, // 🔧 Export le wrapper
   uploadExperience,
   uploadProjectCover,
   uploadProjectPictures
