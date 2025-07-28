@@ -84,7 +84,10 @@ const projectPictureStorage = new CloudinaryStorage({
 // 🔧 MULTER CONFIGS (AVEC FILTRES)
 const uploadSkill = multer({ 
   storage: skillStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB
+    files: 1
+  },
   fileFilter: skillFileFilter
 });
 

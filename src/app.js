@@ -273,7 +273,7 @@ app.get('/test-skill-image', (req, res) => {
 });
 
 // ======= IMPORT DES ROUTES =======
-const skillRoutes = require('./config/cloudinary');
+const skillRoutes = require('./routes/skillRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const userRoutes = require('./routes/userRoutes');
 const experienceRoutes = require('./routes/experienceRoutes');
