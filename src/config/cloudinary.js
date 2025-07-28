@@ -9,12 +9,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🔧 STORAGE POUR LES SKILLS (CORRIGÉ)
+// ✅ SKILLS CONFIGURATION
 const skillStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'portfolio/skills',
-    allowed_formats: ['svg', 'png', 'jpg', 'jpeg'],
+    allowed_formats: ['svg', 'png', 'jpg', 'jpeg', 'webp'],
     resource_type: 'auto',
     transformation: [
       { width: 100, height: 100, crop: 'fit', format: 'auto' }
@@ -22,7 +22,6 @@ const skillStorage = new CloudinaryStorage({
   }
 });
 
-// 🔧 AJOUT DU FILTRE AVEC LOGS
 const skillFileFilter = (req, file, cb) => {
   console.log('🔍 SKILL FILE FILTER:', {
     originalname: file.originalname,
@@ -30,31 +29,39 @@ const skillFileFilter = (req, file, cb) => {
     size: file.size
   });
   
-  const allowedTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/jpg'];
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/svg+xml',
+    'image/webp',
+    'image/gif'
+  ];
   
   if (allowedTypes.includes(file.mimetype)) {
     console.log('✅ Fichier accepté');
     cb(null, true);
   } else {
     console.log('❌ Fichier rejeté - type non supporté');
-    cb(new Error('Type de fichier non supporté. Utilisez SVG, PNG ou JPG.'), false);
+    cb(new Error('Format de fichier non autorisé. Utilisez: JPG, PNG, SVG, WEBP, GIF'), false);
   }
 };
 
-const uploadSkill = multer({ 
+const uploadSkillBase = multer({ 
   storage: skillStorage,
   fileFilter: skillFileFilter,
   limits: { 
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1
   }
-}).single('icon');
+});
 
-// 🔧 MIDDLEWARE WRAPPER AVEC LOGS
+// Wrapper avec logs pour skills
 const uploadSkillWithLogs = (req, res, next) => {
   console.log('🚀 UPLOAD SKILL START');
   console.log('📝 Content-Type:', req.headers['content-type']);
   
-  uploadSkill(req, res, (err) => {
+  uploadSkillBase.single('icon')(req, res, (err) => {
     if (err) {
       console.error('❌ UPLOAD ERROR:', err.message);
       return res.status(400).json({
@@ -75,25 +82,7 @@ const uploadSkillWithLogs = (req, res, next) => {
   });
 };
 
-// Filtre des fichiers pour les skills
-const skillFileFilter = (req, file, cb) => {
-  const allowedMimes = [
-    'image/jpeg',
-    'image/jpg', 
-    'image/png',
-    'image/svg+xml', // ✅ Important pour SVG
-    'image/webp',
-    'image/gif'
-  ];
-  
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Format de fichier non autorisé. Utilisez: JPG, PNG, SVG, WEBP, GIF'), false);
-  }
-};
-
-// Storage pour les experiences
+// ✅ EXPERIENCES CONFIGURATION
 const experienceStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -107,7 +96,9 @@ const experienceStorage = new CloudinaryStorage({
   },
 });
 
-// Storage pour les projects covers
+const uploadExperience = multer({ storage: experienceStorage });
+
+// ✅ PROJECTS CONFIGURATION
 const projectCoverStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -121,7 +112,6 @@ const projectCoverStorage = new CloudinaryStorage({
   },
 });
 
-// Storage pour les projects pictures  
 const projectPictureStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -135,23 +125,13 @@ const projectPictureStorage = new CloudinaryStorage({
   },
 });
 
-// 🔧 MULTER CONFIGS (AVEC FILTRES)
-const uploadSkill = multer({ 
-  storage: skillStorage,
-  limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB
-    files: 1
-  },
-  fileFilter: skillFileFilter
-});
-
-const uploadExperience = multer({ storage: experienceStorage });
 const uploadProjectCover = multer({ storage: projectCoverStorage });  
 const uploadProjectPictures = multer({ storage: projectPictureStorage });
 
+// ✅ EXPORTS
 module.exports = {
   cloudinary,
-  uploadSkill: uploadSkillWithLogs, // 🔧 Export le wrapper
+  uploadSkill: uploadSkillWithLogs,
   uploadExperience,
   uploadProjectCover,
   uploadProjectPictures
