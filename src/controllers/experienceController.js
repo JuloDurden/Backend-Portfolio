@@ -82,6 +82,11 @@ const experienceController = {
   // POST /api/experiences - Créer une expérience (PROTÉGÉ)
   createExperience: async (req, res) => {
     try {
+      console.log('📝 CREATE - Headers:', req.headers['content-type']);
+      console.log('📝 CREATE - Body keys:', Object.keys(req.body));
+      console.log('📝 CREATE - uploadedFiles:', req.uploadedFiles);
+      console.log('📁 CREATE - Image présente?', !!req.uploadedFiles?.image);
+      
       const {
         type, position, company, location, startDate, endDate,
         description, technologies
