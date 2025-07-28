@@ -118,7 +118,7 @@ const experienceController = {
         }
       }
 
-      // ✅ CONSTRUCTION TABLEAU DESCRIPTION
+      // ✅ CONSTRUCTION TABLEAU DESCRIPTION (REGEX CORRIGÉE)
       let description = [];
       
       // 1. Récupérer depuis description[0], description[1], etc.
@@ -154,7 +154,7 @@ $/);
 
       console.log('📋 Description construite:', description);
 
-      // ✅ CONSTRUCTION TABLEAU TECHNOLOGIES
+      // ✅ CONSTRUCTION TABLEAU TECHNOLOGIES (REGEX CORRIGÉE)
       let technologies = [];
       
       Object.keys(req.body).forEach(key => {
@@ -330,7 +330,7 @@ $/);
         }
       }
 
-      // ✅ GESTION DESCRIPTION
+      // ✅ GESTION DESCRIPTION (REGEX CORRIGÉE)
       if (req.body.description) {
         let description = [];
         
@@ -361,7 +361,7 @@ $/);
         }
       }
 
-      // ✅ GESTION TECHNOLOGIES  
+      // ✅ GESTION TECHNOLOGIES (REGEX CORRIGÉE)
       if (req.body.technologies) {
         let technologies = [];
         
