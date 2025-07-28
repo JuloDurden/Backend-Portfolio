@@ -64,9 +64,13 @@ const processExperienceImage = (req, res, next) => {
       image: req.file.path, // URL Cloudinary complète
       publicId: req.file.filename // Public ID pour la suppression
     };
-    
-    console.log('✅ Image Experience uploadée sur Cloudinary:', req.uploadedFiles.image);
-    console.log('✅ Public ID:', req.uploadedFiles.publicId);
+
+    // 🔍 DEBUG : VÉRIFIER L'URL CLOUDINARY BRUTE
+    console.log('🔍 ANALYSE req.file.path:');
+    console.log('  - Path brut:', JSON.stringify(req.file.path));
+    console.log('  - Type:', typeof req.file.path);
+    console.log('  - Longueur:', req.file.path?.length);
+    console.log('  - 10 derniers chars:', req.file.path?.slice(-10));
     
     next();
   } catch (error) {

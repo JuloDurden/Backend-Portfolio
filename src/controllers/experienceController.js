@@ -87,6 +87,26 @@ const experienceController = {
       console.log('📝 CREATE - uploadedFiles:', req.uploadedFiles);
       console.log('📁 CREATE - Image présente?', !!req.uploadedFiles?.image);
       
+      // 🔍 DEBUG : ANALYSER L'URL EXACTE
+      if (req.uploadedFiles?.image) {
+        const imageUrl = req.uploadedFiles.image;
+        console.log('🖼️ URL ANALYSE:');
+        console.log('  - URL brute:', JSON.stringify(imageUrl));
+        console.log('  - Type:', typeof imageUrl);
+        console.log('  - Longueur:', imageUrl.length);
+        console.log('  - 10 derniers chars:', imageUrl.slice(-10));
+        console.log('  - Finit par .png:', imageUrl.endsWith('.png'));
+        console.log('  - Contient ;:', imageUrl.includes(';'));
+        
+        // 🧹 NETTOYAGE TEMPORAIRE
+        const cleanUrl = imageUrl.replace(/;+$/, ''); // Enlève tous les ; à la fin
+        console.log('  - URL nettoyée:', cleanUrl);
+        console.log('  - URL identique:', imageUrl === cleanUrl);
+        
+        // Utiliser l'URL nettoyée temporairement
+        req.uploadedFiles.image = cleanUrl;
+      }
+
       const {
         type, position, company, location, startDate, endDate,
         description, technologies
