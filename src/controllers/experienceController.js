@@ -155,9 +155,12 @@ const experienceController = {
     }
   },
 
-  // PUT /api/experiences/:id - Modifier une expérience (PROTÉGÉ)
+  // PUT /api/experiences/:id - Modifier une expérience (PROTÉGÉ) - ✅ CORRIGÉ
   updateExperience: async (req, res) => {
     try {
+      console.log('🔄 UPDATE - Body reçu:', req.body);
+      console.log('🔄 UPDATE - uploadedFiles:', req.uploadedFiles);
+      
       const {
         type, position, company, location, startDate, endDate,
         description, technologies
@@ -175,54 +178,70 @@ const experienceController = {
       // Sauvegarder l'ancienne image pour suppression si remplacement
       const oldImage = experience.image;
 
-      // Gestion de l'image
-      if (req.uploadedFiles?.image) {
-        experience.image = req.uploadedFiles.image; // Nouvelle URL Cloudinary
+      // ✅ MISE À JOUR SÉLECTIVE (seulement les champs fournis ET non vides)
+      if (type !== undefined && type.trim()) {
+        experience.type = type.trim();
       }
 
-      // ✅ MISE À JOUR SÉLECTIVE (seulement les champs fournis)
-      const updateFields = {};
+      if (position !== undefined && position.trim()) {
+        experience.position = position.trim();
+      }
 
-      if (type) updateFields.type = type;
-      if (position) updateFields.position = position;
-      if (company !== undefined) updateFields.company = company; // Peut être vide
-      if (location) updateFields.location = location;
+      if (company !== undefined) { // Peut être vide
+        experience.company = company;
+      }
+
+      if (location !== undefined && location.trim()) {
+        experience.location = location.trim();
+      }
       
       // ✅ VALIDATION DES DATES
-      if (startDate) {
+      if (startDate !== undefined && startDate.trim()) {
         const parsedStartDate = new Date(startDate);
         if (!isNaN(parsedStartDate.getTime())) {
-          updateFields.startDate = parsedStartDate;
+          experience.startDate = parsedStartDate;
         }
       }
       
       if (endDate !== undefined) {
-        if (endDate) {
+        if (endDate.trim()) {
           const parsedEndDate = new Date(endDate);
           if (!isNaN(parsedEndDate.getTime())) {
-            updateFields.endDate = parsedEndDate;
+            experience.endDate = parsedEndDate;
           }
         } else {
-          updateFields.endDate = null; // Job actuel
+          experience.endDate = null; // Job actuel
         }
       }
 
-      // ✅ GESTION DESCRIPTION
-      if (description) {
-        updateFields.description = Array.isArray(description) 
+      // ✅ GESTION DESCRIPTION (ne modifie QUE si fournie)
+      if (description !== undefined) {
+        experience.description = Array.isArray(description) 
           ? description.filter(d => d && d.trim()) // Supprime les vides
           : [description].filter(d => d && d.trim());
       }
 
-      // ✅ GESTION TECHNOLOGIES  
-      if (technologies) {
-        updateFields.technologies = Array.isArray(technologies)
+      // ✅ GESTION TECHNOLOGIES (ne modifie QUE si fournies)
+      if (technologies !== undefined) {
+        experience.technologies = Array.isArray(technologies)
           ? technologies.filter(t => t && t.trim()) // Supprime les vides
           : [technologies].filter(t => t && t.trim());
       }
 
-      // ✅ APPLICATION DES MISES À JOUR
-      Object.assign(experience, updateFields);
+      // ✅ GESTION DE L'IMAGE
+      if (req.uploadedFiles?.image) {
+        experience.image = req.uploadedFiles.image; // Nouvelle URL Cloudinary
+      }
+
+      console.log('💾 Expérience avant sauvegarde:', {
+        type: experience.type,
+        position: experience.position,
+        company: experience.company,
+        location: experience.location,
+        description: experience.description,
+        technologies: experience.technologies,
+        image: experience.image ? 'Present' : 'Absent'
+      });
 
       await experience.save();
 
