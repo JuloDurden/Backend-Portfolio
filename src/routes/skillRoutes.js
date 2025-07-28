@@ -1,5 +1,5 @@
 const express = require('express');
-const uploadSkill = require('../middleware/uploadSkill');
+const uploadSkill = require('../config/cloudinary');
 const {
   getSkills,
   getSkillsByCategory,
