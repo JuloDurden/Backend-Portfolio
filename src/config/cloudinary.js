@@ -9,80 +9,37 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ SKILLS CONFIGURATION
+// 🔧 STORAGE POUR LES SKILLS (CORRIGÉ)
 const skillStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'portfolio/skills',
-    allowed_formats: ['svg', 'png', 'jpg', 'jpeg', 'webp'],
-    resource_type: 'auto',
-    transformation: [
-      { width: 100, height: 100, crop: 'fit', format: 'auto' }
-    ]
-  }
+    allowed_formats: ['jpg', 'png', 'gif', 'svg', 'jpeg', 'webp'],
+    resource_type: 'auto', // ✅ CRUCIAL pour les SVG
+    public_id: (req, file) => `skill_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // ✅ SUPPRESSION des transformations qui cassent les SVG
+  },
 });
 
+// Filtre des fichiers pour les skills
 const skillFileFilter = (req, file, cb) => {
-  console.log('🔍 SKILL FILE FILTER:', {
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size
-  });
-  
-  const allowedTypes = [
+  const allowedMimes = [
     'image/jpeg',
     'image/jpg', 
     'image/png',
-    'image/svg+xml',
+    'image/svg+xml', // ✅ Important pour SVG
     'image/webp',
     'image/gif'
   ];
   
-  if (allowedTypes.includes(file.mimetype)) {
-    console.log('✅ Fichier accepté');
+  if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    console.log('❌ Fichier rejeté - type non supporté');
     cb(new Error('Format de fichier non autorisé. Utilisez: JPG, PNG, SVG, WEBP, GIF'), false);
   }
 };
 
-const uploadSkillBase = multer({ 
-  storage: skillStorage,
-  fileFilter: skillFileFilter,
-  limits: { 
-    fileSize: 5 * 1024 * 1024, // 5MB
-    files: 1
-  }
-});
-
-// Wrapper avec logs pour skills
-const uploadSkillWithLogs = (req, res, next) => {
-  console.log('🚀 UPLOAD SKILL START');
-  console.log('📝 Content-Type:', req.headers['content-type']);
-  
-  uploadSkillBase.single('icon')(req, res, (err) => {
-    if (err) {
-      console.error('❌ UPLOAD ERROR:', err.message);
-      return res.status(400).json({
-        success: false,
-        message: `Erreur upload: ${err.message}`
-      });
-    }
-    
-    console.log('✅ UPLOAD SUCCESS:', req.file ? 'File uploaded' : 'No file');
-    if (req.file) {
-      console.log('📎 File details:', {
-        filename: req.file.filename,
-        path: req.file.path,
-        size: req.file.size
-      });
-    }
-    next();
-  });
-};
-
-// ✅ EXPERIENCES CONFIGURATION
+// Storage pour les experiences
 const experienceStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -96,9 +53,7 @@ const experienceStorage = new CloudinaryStorage({
   },
 });
 
-const uploadExperience = multer({ storage: experienceStorage });
-
-// ✅ PROJECTS CONFIGURATION
+// Storage pour les projects covers
 const projectCoverStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -112,6 +67,7 @@ const projectCoverStorage = new CloudinaryStorage({
   },
 });
 
+// Storage pour les projects pictures  
 const projectPictureStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -125,13 +81,23 @@ const projectPictureStorage = new CloudinaryStorage({
   },
 });
 
+// 🔧 MULTER CONFIGS (AVEC FILTRES)
+const uploadSkill = multer({ 
+  storage: skillStorage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB
+    files: 1
+  },
+  fileFilter: skillFileFilter
+});
+
+const uploadExperience = multer({ storage: experienceStorage });
 const uploadProjectCover = multer({ storage: projectCoverStorage });  
 const uploadProjectPictures = multer({ storage: projectPictureStorage });
 
-// ✅ EXPORTS
 module.exports = {
   cloudinary,
-  uploadSkill: uploadSkillWithLogs,
+  uploadSkill,
   uploadExperience,
   uploadProjectCover,
   uploadProjectPictures
