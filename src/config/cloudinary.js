@@ -14,11 +14,13 @@ const skillStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'portfolio/skills',
-    allowed_formats: ['jpg', 'png', 'gif', 'svg', 'jpeg', 'webp'],
-    resource_type: 'auto', // ✅ CRUCIAL pour les SVG
+    resource_type: 'auto', // ✅ Laisse Cloudinary décider
+    // ✅ Retire allowed_formats qui peut créer des conflits
     public_id: (req, file) => `skill_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    // ✅ SUPPRESSION des transformations qui cassent les SVG
-  },
+    transformation: [
+      { width: 100, height: 100, crop: 'fit', format: 'auto', flags: 'sanitize' }
+    ]
+  }
 });
 
 // Filtre des fichiers pour les skills
