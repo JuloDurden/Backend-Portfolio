@@ -108,4 +108,6 @@ projectSchema.statics.getFeaturedProjects = function() {
   return this.find({ featured: true, isVisible: true }).sort({ order: 1 });
 };
 
+projectSchema.index({ _id: 1 }, { unique: true });
+
 module.exports = mongoose.model('Project', projectSchema);

@@ -114,8 +114,9 @@ const getFeaturedProjects = async (req, res) => {
  */
 const createProject = async (req, res) => {
   try {
-    // 🔧 NOUVEAU : Récupération des URLs Cloudinary
-    const projectData = { ...req.body };
+    // 🔥 CORRECTION : Ne PAS inclure le champ 'id' du frontend
+    const { id, ...bodyWithoutId } = req.body; // Destructure pour enlever 'id'
+    const projectData = { ...bodyWithoutId };
     
     // Si des fichiers ont été uploadés sur Cloudinary
     if (req.uploadedFiles) {
