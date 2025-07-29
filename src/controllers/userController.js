@@ -139,9 +139,11 @@ const userController = {
     }
   },
 
-  // PATCH /api/user/avatar - Upload avatar (PROTÉGÉ)
+  // PATCH /api/user/avatar - Upload avatar (PROTÉGÉ) - 🔥 CORRIGÉ POUR CLOUDINARY
   updateAvatar: async (req, res) => {
     try {
+      console.log('📸 updateAvatar - req.file:', req.file);
+      
       const user = await User.findOne();
       
       if (!user) {
@@ -151,22 +153,29 @@ const userController = {
         });
       }
 
-      // 🗑️ Supprimer l'ancien avatar s'il existe
-      if (user.profilePicture) {
-        const oldAvatarPath = path.join(__dirname, '..', user.profilePicture);
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-        }
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Aucun fichier fourni'
+        });
       }
 
-      // 💾 Mettre à jour avec le nouvel avatar
-      const avatarPath = `uploads/avatars/${req.file.filename}`;
-      user.profilePicture = avatarPath;
+      // 🗑️ PAS DE SUPPRESSION LOCAL (Cloudinary gère automatiquement)
+      // L'ancien avatar reste sur Cloudinary (pas de problème de stockage)
+
+      // 💾 Récupérer l'URL Cloudinary depuis req.file.path
+      const cloudinaryUrl = req.file.path; // URL complète Cloudinary
+      console.log('🌟 URL Cloudinary reçue:', cloudinaryUrl);
+
+      // 🔄 Mettre à jour la base avec l'URL Cloudinary
+      user.profilePicture = cloudinaryUrl;
       await user.save();
 
       // ✅ Réponse sans password
       const userResponse = user.toObject();
       delete userResponse.password;
+
+      console.log('✅ Avatar sauvé en base:', userResponse.profilePicture);
 
       res.json({
         success: true,
@@ -174,12 +183,14 @@ const userController = {
         message: 'Avatar mis à jour avec succès',
         avatar: {
           filename: req.file.filename,
-          path: avatarPath,
-          size: req.file.size
+          path: cloudinaryUrl,      // 🌟 URL CLOUDINARY COMPLÈTE
+          url: cloudinaryUrl,       // 🌟 ALIAS POUR COMPATIBILITÉ
+          size: req.file.size,
+          public_id: req.file.public_id || req.file.filename
         }
       });
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
+      console.error('❌ Erreur lors de la mise à jour de l\'avatar:', error);
       res.status(500).json({
         success: false,
         message: 'Erreur serveur'
