@@ -12,7 +12,7 @@ router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
 router.post('/avatar', protect, uploadAvatar, userController.updateAvatar);
 
 // 🆕 Nouvelles routes spécifiques
-router.put('/personal', protect, userController.updatePersonalData);
+router.put('/personal-data', protect, userController.updatePersonalData);
 router.put('/about', protect, userController.updateAboutData);
 
 module.exports = router;
