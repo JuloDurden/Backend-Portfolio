@@ -1,12 +1,6 @@
 const mongoose = require('mongoose');
 
 const projectSchema = new mongoose.Schema({
-  id: {
-    type: String,
-    required: [true, 'L\'ID est requis'],
-    unique: true,
-    trim: true
-  },
   title: {
     type: String,
     required: [true, 'Le titre est requis'],
