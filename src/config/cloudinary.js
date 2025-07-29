@@ -108,14 +108,30 @@ const uploadSkill = multer({
   fileFilter: skillFileFilter
 });
 
+// 📸 Storage pour les AVATARS
+const avatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'portfolio/avatars',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+    resource_type: 'image',
+    transformation: [
+      { width: 500, height: 500, crop: 'fill', quality: 'auto:good' }
+    ],
+    public_id: (req, file) => `avatar_${Date.now()}`,
+  },
+});
+
 const uploadExperience = multer({ storage: experienceStorage });
 const uploadProjectCover = multer({ storage: projectCoverStorage });  
 const uploadProjectPictures = multer({ storage: projectPictureStorage });
+const uploadAvatar = multer({ storage: avatarStorage });
 
 module.exports = {
   cloudinary,
   uploadSkill,
   uploadExperience,
   uploadProjectCover,
-  uploadProjectPictures
+  uploadProjectPictures,
+  uploadAvatar
 };
