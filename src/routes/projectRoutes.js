@@ -20,6 +20,11 @@ router.get('/featured', getFeaturedProjects);
 router.get('/category/:category', getProjectsByCategory);
 router.get('/:id', getProjectById);
 
+// Routes de debug (temporaires)
+router.get('/debug', debugProjects);
+router.delete('/cleanup', cleanupProjects);
+
+
 // Routes privées (Admin) - AVEC UPLOAD MIDDLEWARE
 router.post('/', uploadProjectImages, createProject);
 router.put('/:id', uploadProjectImages, updateProject);

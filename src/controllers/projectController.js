@@ -108,6 +108,58 @@ const getFeaturedProjects = async (req, res) => {
 };
 
 /**
+ * 🚨 ROUTE DE DEBUG - Voir les documents corrompus
+ */
+const debugProjects = async (req, res) => {
+  try {
+    const allProjects = await Project.find({});
+    const corruptedProjects = allProjects.filter(p => p.id === null || p.id === undefined);
+    
+    res.json({
+      total: allProjects.length,
+      corrupted: corruptedProjects.length,
+      corruptedIds: corruptedProjects.map(p => p._id),
+      sampleData: allProjects.slice(0, 2),
+      indexes: await Project.collection.getIndexes()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * 🧹 ROUTE DE NETTOYAGE - Supprimer documents corrompus
+ */
+const cleanupProjects = async (req, res) => {
+  try {
+    // Supprimer tous les documents avec id: null
+    const result = await Project.deleteMany({ 
+      $or: [
+        { id: null }, 
+        { id: undefined },
+        { id: { $exists: true, $eq: null } }
+      ]
+    });
+    
+    // Supprimer l'index problématique sur 'id'
+    try {
+      await Project.collection.dropIndex('id_1');
+      console.log('✅ Index id_1 supprimé');
+    } catch (e) {
+      console.log('⚠️ Index id_1 non trouvé ou déjà supprimé');
+    }
+    
+    res.json({
+      message: '🧹 Nettoyage terminé',
+      deletedCount: result.deletedCount,
+      indexDropped: true
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
  * @desc    Créer un nouveau projet
  * @route   POST /api/projects
  * @access  Private (Admin)
@@ -311,5 +363,7 @@ module.exports = {
   getFeaturedProjects,
   createProject,
   updateProject,
-  deleteProject
+  deleteProject,
+  debugProjects,
+  cleanupProjects
 };
