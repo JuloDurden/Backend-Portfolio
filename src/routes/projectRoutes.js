@@ -6,7 +6,9 @@ const {
   getFeaturedProjects,
   createProject,
   updateProject,
-  deleteProject
+  deleteProject,
+  debugProjects,
+  cleanupProjects
 } = require('../controllers/projectController');
 
 // 🔗 IMPORT DU MIDDLEWARE D'UPLOAD
