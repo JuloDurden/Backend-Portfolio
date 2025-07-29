@@ -9,30 +9,34 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🔧 STORAGE POUR LES SKILLS (CORRIGÉ)
+// 🔧 STORAGE POUR LES SKILLS (CORRIGÉ SVG)
 const skillStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: (req, file) => {
     console.log('📁 Processing file:', file.mimetype);
     
+    // 🎯 CORRECTION SVG
+    const isSvg = file.mimetype === 'image/svg+xml';
+    
     return {
       folder: 'portfolio/skills',
-      resource_type: 'image', // ✅ Toujours image
-      allowed_formats: ['svg', 'png', 'jpg', 'jpeg', 'webp'],
+      resource_type: isSvg ? 'raw' : 'image', // ✅ SVG = raw, autres = image
+      allowed_formats: isSvg ? ['svg'] : ['png', 'jpg', 'jpeg', 'webp'],
       public_id: `skill_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      transformation: [
+      // Transformation SEULEMENT pour les images (pas SVG)
+      transformation: isSvg ? undefined : [
         { 
           width: 100, 
           height: 100, 
           crop: 'fit',
-          quality: 'auto',
-          flags: file.mimetype === 'image/svg+xml' ? 'sanitize' : undefined
+          quality: 'auto'
         }
-      ]
+      ],
+      // Flags SVG
+      flags: isSvg ? 'sanitize' : undefined
     };
   }
 });
-
 
 // Filtre des fichiers pour les skills
 const skillFileFilter = (req, file, cb) => {
