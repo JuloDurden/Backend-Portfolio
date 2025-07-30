@@ -33,7 +33,7 @@ app.use(cors({
     'http://localhost:4173',  // npm run preview  
     'https://portfolio-mu-liart-34.vercel.app', // 🔧 URL Vercel directe
     'https://www.julienclavel.fr',
-    'https://julienclavel.fr'
+    'https://julienclavel.fr',
     process.env.FRONTEND_VERCEL_URL,
     process.env.FRONTEND_URL  // production
   ].filter(Boolean), // Supprime les undefined
