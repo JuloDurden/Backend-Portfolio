@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
@@ -135,6 +136,82 @@ const userController = {
       res.status(500).json({
         success: false,
         message: 'Erreur serveur'
+      });
+    }
+  },
+
+  // 🔐 NOUVELLE FONCTION - Changer le mot de passe
+  changePassword: async (req, res) => {
+    try {
+      console.log('🔐 Changement de mot de passe demandé');
+      
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user?.id || req.user?._id; // Compatible avec votre auth
+
+      console.log('🔍 User ID:', userId);
+
+      // Validation des données
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Mot de passe actuel et nouveau mot de passe requis' 
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Le nouveau mot de passe doit contenir au moins 6 caractères' 
+        });
+      }
+
+      // Récupérer l'utilisateur avec le mot de passe
+      // 🎯 ADAPTATION À VOTRE SYSTÈME (un seul user)
+      const user = await User.findOne().select('+password');
+      
+      if (!user) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'Utilisateur non trouvé' 
+        });
+      }
+
+      console.log('✅ Utilisateur trouvé, vérification du mot de passe...');
+
+      // Vérifier le mot de passe actuel
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        console.log('❌ Mot de passe actuel incorrect');
+        return res.status(400).json({ 
+          success: false,
+          message: 'Mot de passe actuel incorrect' 
+        });
+      }
+
+      console.log('✅ Mot de passe actuel validé, hashage du nouveau...');
+
+      // Hasher le nouveau mot de passe
+      const saltRounds = 12;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Mettre à jour le mot de passe
+      await User.findByIdAndUpdate(user._id, { 
+        password: hashedNewPassword,
+        updatedAt: new Date()
+      });
+
+      console.log('✅ Mot de passe mis à jour avec succès');
+
+      res.status(200).json({ 
+        success: true,
+        message: 'Mot de passe modifié avec succès' 
+      });
+
+    } catch (error) {
+      console.error('❌ Erreur lors du changement de mot de passe:', error);
+      res.status(500).json({ 
+        success: false,
+        message: 'Erreur serveur lors du changement de mot de passe' 
       });
     }
   },

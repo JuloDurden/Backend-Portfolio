@@ -11,8 +11,11 @@ router.put('/', protect, userController.updateUser);
 router.patch('/avatar', protect, uploadAvatar, userController.updateAvatar);
 router.post('/avatar', protect, uploadAvatar, userController.updateAvatar);
 
-// 🆕 Nouvelles routes spécifiques
+// 🎛️ Routes spécifiques
 router.put('/personal-data', protect, userController.updatePersonalData);
 router.put('/about', protect, userController.updateAboutData);
+
+// 🔐 Changement de mot de passe
+router.put('/change-password', protect, userController.changePassword);
 
 module.exports = router;
